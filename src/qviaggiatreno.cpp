@@ -159,7 +159,7 @@ void QViaggiaTreno::creaAzioni()
 
     m_apriAct = new QAction(QString::fromUtf8("Apri..."), this);
     m_apriAct->setStatusTip(QString::fromUtf8("Apre una lista di treni"));
-    m_apriAct->setIcon(QIcon(":/img/apri.png"));
+    m_apriAct->setIcon(QIcon::fromTheme("document-open"));
     connect(m_apriAct, SIGNAL(triggered()), this, SLOT(apri()));
 
     m_salvaAct = new QAction(QString::fromUtf8("Salva"), this);
@@ -285,7 +285,7 @@ void QViaggiaTreno::creaToolBar()
     m_listaToolbar->addAction(m_rimuoviTrenoAct);
     m_listaToolbar->addAction(m_rimuoviTuttiAct);
 
-    m_listaToolbar->setVisible(false);
+    m_listaToolbar->setVisible(true);
 }
 
 
