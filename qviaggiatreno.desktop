@@ -2,6 +2,7 @@
 Name=QViaggiaTreno
 Comment=Interfaccia grafica per ViaggiaTreno
 Exec=qviaggiatreno
+Icon=qviaggiatreno
 Terminal=false
 Type=Application
 GenericName=Informazioni in tempo reale sulla circolazione ferroviaria
