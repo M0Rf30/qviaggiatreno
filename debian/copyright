@@ -1,0 +1,53 @@
+Format: http://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: qviaggiatreno
+Source: https://xp-dev.com/forum/57
+
+Files: *
+Copyright: 2008-2013 fra74 <francesco.b74@gmail.com>
+License: GPL-2+
+
+Files: src/qledindicator.h
+       src/qledindicator.cpp
+Copyright: 2010 by Tn <thenobody@poczta.fm>
+License: LGPL-3+
+
+Files: debian/*
+Copyright: 2009-2013 Davide Puricelli <evo@debian.org>
+           2009-2013 fra74 <francesco.b74@gmail.com>
+           2013-2015 Gianfranco Costamagna <locutusofborg@debian.org>
+License: GPL-2+
+
+License: GPL-2+
+ This program is free software; you can redistribute it and/or
+ modify it under the terms of the GNU General Public License
+ as published by the Free Software Foundation; either version 2
+ of the License, or (at your option) any later version.
+ .
+ This program is distributed in the hope that it will be useful,
+ but WITHOUT ANY WARRANTY; without even the implied warranty of
+ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ GNU General Public License for more details.
+ .
+ You should have received a copy of the GNU General Public License
+ along with this program; if not, write to the Free Software
+ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ .
+ On Debian systems, the complete text of the GNU General Public License
+ can be found in /usr/share/common-licenses/GPL-2 file.
+
+License: LGPL-3+
+ BOINC is free software; you can redistribute it and/or modify it
+ under the terms of the GNU Lesser General Public License
+ as published by the Free Software Foundation,
+ either version 3 of the License, or (at your option) any later version.
+ .
+ BOINC is distributed in the hope that it will be useful,
+ but WITHOUT ANY WARRANTY; without even the implied warranty of
+ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ See the GNU Lesser General Public License for more details.
+ .
+ You should have received a copy of the GNU Lesser General Public License
+ along with BOINC.  If not, see <http://www.gnu.org/licenses/>.
+ .
+ On Debian systems, the complete text of the GNU Lesser General Public License
+ can be found in `/usr/share/common-licenses/LGPL-3'.

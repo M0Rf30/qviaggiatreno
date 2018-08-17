@@ -1,0 +1,24 @@
+<RCC>
+    <qresource prefix="/">
+        <file>doc/GPL-2.txt</file>
+        <file>img/avvia.png</file>
+        <file>img/chiudi.png</file>
+        <file>img/interrompi.png</file>
+        <file>traduzioni/qt_it.qm</file>
+        <file>img/stazione.png</file>
+        <file>img/listatreni.png</file>
+        <file>img/treno.png</file>
+        <file>img/aggiungi.png</file>
+        <file>img/rimuovi.png</file>
+        <file>img/cancella-tutti.png</file>
+        <file>img/apri.png</file>
+        <file>img/salva.png</file>
+        <file>img/salva-come.png</file>
+        <file>img/cronometro.png</file>
+        <file>img/configura.png</file>
+        <file>img/aggiorna.png</file>
+        <file>img/stampa.png</file>
+        <file>img/esporta.png</file>
+        <file>img/trenord.png</file>
+    </qresource>
+</RCC>

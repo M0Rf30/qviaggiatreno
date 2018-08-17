@@ -1,0 +1,64 @@
+2013.7
+
+  * Fixed Viaggiatreno URL to synchronize with the changes introduced by TI
+  * Qviaggiatreno now using version 5 of the qt libraries
+
+2012.11
+
+  * Eliminated window display that warned of an error page analysis of ViaggiaTreno. In its place, an error message is displayed in bold red + tab instead of the update date.
+  * Fixed bug that caused crash when cancelling train list save operation. Thanks to Yuri for report and fix.
+
+2012.9
+
+  * Finally fixed display bug of trains partially deleted. The previous fix caused a problem with entirely eliminated trains :-(
+  * Added ability to use the system proxy, configurable in the proxy configuration window
+  * Added GUI splitter into the station card in order to change the relative height of the tables of arrivals and departures
+  * Added filters to display only tab station trains arriving or departing that belong to a certain category or that have some origin/destination
+
+2011.2.2
+
+  * Fixed sorting by time of departure tab station across midnight because it involved the fact that the trains departing after midnight were put before those departing before midnight.
+  * Fixed bug when displaying trains partially suppressed that were completely suppressed instead
+
+2011.2.1
+
+  * Fixed bug that caused crash if the station name shorter than 3 characters
+  * Fixed bug that prevented proper update on trains list tab of canceled trains columns
+
+2011.2
+
+  * Introduced support for HTTP proxy
+  * Introduced a periodic monitoring of correct functioning of ViaggiaTreno
+  * Introduced a dialog for configuring ViaggiaTreno
+  * Trains Train tab are automatically sorted by time of departure/arrival
+  * Changed code to search for the station name of which create a tab
+  * Removed button to change the update interval of the tabs, not required
+
+2010.11.1
+
+  * Introduced code to handle the case in which different trains that run through different networks have the same number
+  * Experimental workaround of a bug in ViaggiaTreno that in the case of LeNord Station that run through the railroad link, shows multiple entries with the same number in the prospectus train station
+
+2010.11
+
+  * Fixed bug #42 (application crash when you try to follow the progress of a deleted train)
+  * Worked around bug #72 (tab train crash if you load an incomplete page)
+  * Removed window with a list of open tabs, not used
+  * Rewritten code for the interrogation and ViaggiaTreno downloading and parsing of the data
+  * The configuration informations are saved in a file.ini instead of the registry (in Windows) so you can easily modify them to restore QViaggiaTreno start after a crash 
+  * The station tab the train delay is color coded: red for trains with more than 10 minutes late, dark yellow for those with a delay of between 3 and 10 minutes.
+
+2009.09
+
+  * Added button for manually updating tabs
+  * Added close button in each tab and removed global button (this change requires qt 4.5)
+  * View current tab title in the window title
+  * Support for new features ViaggiaTreno (removed stops)
+
+2009.03.1
+  
+  * New release
+
+2009.03
+
+  * First release
