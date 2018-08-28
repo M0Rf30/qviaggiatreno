@@ -90,7 +90,7 @@ void QViaggiaTreno::creaAzioni()
 
     m_nuovaListaTreniAct = new QAction(QString::fromUtf8("Lista di treni"), this);
     m_nuovaListaTreniAct->setStatusTip(QString::fromUtf8("Controlla una lista di treni con ViaggiaTreno"));
-    m_nuovaListaTreniAct->setIcon(QIcon::fromTheme("playlist-sort"));
+    m_nuovaListaTreniAct->setIcon(QIcon::fromTheme("view-sort-ascending"));
     connect(m_nuovaListaTreniAct, SIGNAL(triggered()), this, SLOT(nuovaListaTreni()));
 
     m_avvisiTrenordAct = new QAction(QString::fromUtf8("Avvisi Trenord"), this);
