@@ -4,7 +4,7 @@ QViaggiaTreno è un front-end grafico a ViaggiaTreno, il servizio web di Trenita
 
 È scritto utilizzando le librerie Qt 5 e seguenti  e può essere eseguito sotto Linux, Windows e Mac
 
-# Ringraziamenti
+## Ringraziamenti
 
 Voglio ringraziare tutte le persone che hanno provato le varie versioni beta che ho messo a disposizione, segnalandomi bug o 
 facendo suggerimenti. In particolare, senza togliere niente a nessuno, ringrazio:
@@ -15,6 +15,7 @@ facendo suggerimenti. In particolare, senza togliere niente a nessuno, ringrazio
 * danny1984, trambvs, xyz per aver segnalato bug o difetti
 * Il Max per avermi segnalato immediatamente l'esistenza di treni soppressi o parzialmente soppressi, permettendomi di individuare alcuni bug insidiosi
 
-# Original author
+## Original author
 fra74 (https://github.com/fra74)
+## Original repo
 http://svn.xp-dev.com/svn/qviaggiatreno/trunk/
