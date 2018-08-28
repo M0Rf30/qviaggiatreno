@@ -16,6 +16,5 @@ facendo suggerimenti. In particolare, senza togliere niente a nessuno, ringrazio
 * Il Max per avermi segnalato immediatamente l'esistenza di treni soppressi o parzialmente soppressi, permettendomi di individuare alcuni bug insidiosi
 
 # Original author
-fra74
-
+fra74 (https://github.com/fra74)
 http://svn.xp-dev.com/svn/qviaggiatreno/trunk/
