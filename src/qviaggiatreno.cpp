@@ -85,7 +85,7 @@ void QViaggiaTreno::creaAzioni()
 
     m_nuovoTrenoAct = new QAction(QString::fromUtf8("Treno..."), this);
     m_nuovoTrenoAct->setStatusTip(QString::fromUtf8("Controlla un treno con ViaggiaTreno"));
-    m_nuovoTrenoAct->setIcon(QIcon::fromTheme("view-time-schedule"));
+    m_nuovoTrenoAct->setIcon(QIcon::fromTheme("view-more-horizontal-symbolic"));
     connect(m_nuovoTrenoAct, SIGNAL(triggered()), this, SLOT(nuovoTreno()));
 
     m_nuovaListaTreniAct = new QAction(QString::fromUtf8("Lista di treni"), this);
