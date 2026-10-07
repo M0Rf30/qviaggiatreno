@@ -19,6 +19,9 @@
  ***************************************************************************/
 
 #include "utils.h"
+#include <QIODevice>
+#include <QMessageBox>
+#include <QTextStream>
 
 //funzioni varie per il debug dei nodi DOM
 QString dumpNodo(QDomNode nodo)

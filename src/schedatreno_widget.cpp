@@ -21,6 +21,17 @@
 
 #include "schedatreno.h"
 #include "parser_viaggiatreno_treno.h"
+#include "schedalistatreni.h"
+
+#include <QGridLayout>
+#include <QHBoxLayout>
+#include <QHeaderView>
+#include <QLabel>
+#include <QListWidget>
+#include <QListWidgetItem>
+#include <QMouseEvent>
+#include <QPushButton>
+#include <QVBoxLayout>
 
 //questo widget si occupa di presentare all'utente una lista delle stazioni proposte da viaggiatreno per
 //risolvere l'ambiguità del nome inserito dall'utente
@@ -65,8 +76,12 @@ WidgetDisambiguaNumeroTreno::WidgetDisambiguaNumeroTreno(SchedaQViaggiaTreno* pa
     lista->setCurrentRow(0);
 
     //connessioni
-    connect(btnSceltaStazione, SIGNAL(clicked()), this, SLOT(sceltaTreno()));
-    connect(this, SIGNAL(numeroDisambiguato(const QString&)), parent, SLOT(cambiaCodiceOrigine(const QString&)));
+    connect(btnSceltaStazione, &QPushButton::clicked, this, &WidgetDisambiguaNumeroTreno::sceltaTreno);
+    //la scheda genitore può essere una scheda treno o una lista di treni
+    if (auto schedaTreno = qobject_cast<SchedaTreno*>(parent))
+        connect(this, &WidgetDisambiguaNumeroTreno::numeroDisambiguato, schedaTreno, &SchedaTreno::cambiaCodiceOrigine);
+    else if (auto schedaLista = qobject_cast<SchedaListaTreni*>(parent))
+        connect(this, &WidgetDisambiguaNumeroTreno::numeroDisambiguato, schedaLista, &SchedaListaTreni::cambiaCodiceOrigine);
 }
 
 //slot
@@ -161,11 +176,10 @@ WidgetDatiTreno::WidgetDatiTreno(SchedaTreno *parent) : QWidget(parent)
         setLayout(layout);
 
         //conessioni
-        connect(m_stazionePartenza, SIGNAL(linkActivated(const QString& )), this, SLOT(linkAttivato(const QString&)));
-        connect(m_stazioneArrivo, SIGNAL(linkActivated(const QString& )), this, SLOT(linkAttivato(const QString&)));
-        connect(this, SIGNAL(apriSchedaStazione(const QString&, bool)), parent, SIGNAL(apriSchedaStazione(const QString&, bool)));
-        //connect(m_tabella, SIGNAL(itemActivated(QTableWidgetItem *)), this, SLOT(itemAttivato(QTableWidgetItem*)));
-        connect(m_tabella, SIGNAL(itemClicked(QTableWidgetItem *)), this, SLOT(itemAttivato(QTableWidgetItem*)));
+        connect(m_stazionePartenza, &QLabel::linkActivated, this, &WidgetDatiTreno::linkAttivato);
+        connect(m_stazioneArrivo, &QLabel::linkActivated, this, &WidgetDatiTreno::linkAttivato);
+        connect(this, &WidgetDatiTreno::apriSchedaStazione, parent, &SchedaQViaggiaTreno::apriSchedaStazione);
+        connect(m_tabella, &QTableWidget::itemClicked, this, &WidgetDatiTreno::itemAttivato);
 }
 
 void WidgetDatiTreno::impostaNumeroTreno(const QString& numero)
@@ -227,7 +241,7 @@ void WidgetDatiTreno::aggiornaTreno(const TrenoVT::DatiTreno& treno)
                         if (fermata->soppressa())
                         {
                                 item = new QTableWidgetItem(QString::fromUtf8("Soppressa"));
-                                item->setTextColor(Qt::red);
+                                item->setForeground(Qt::red);
                         }
                         else
                                 item = new QTableWidgetItem(QString::fromUtf8("No"));
@@ -361,7 +375,7 @@ TabellaFermate::TabellaFermate(QWidget *parent) : QTableWidget(parent)
 void TabellaFermate::mouseMoveEvent(QMouseEvent *event)
 {
 
-        int col = columnAt(event->x());
+        int col = columnAt(event->position().toPoint().x());
         if (col == TrenoVT::colFermata )
                 setCursor(Qt::PointingHandCursor);
         else

@@ -2,5 +2,6 @@
     <qresource prefix="/">
         <file>traduzioni/qt_it.qm</file>
         <file>img/trenord.png</file>
+        <file>doc/GPL-2.txt</file>
     </qresource>
 </RCC>

@@ -2,7 +2,7 @@ QViaggiaTreno 20011.2.2
 
 QViaggiaTreno è un front-end grafico a ViaggiaTreno, il servizio web di Trenitalia con informazioni in tempo reale sulla circolazione dei treni passeggeri.
 
-È scritto utilizzando le librerie Qt 4.5 e seguenti  e può essere eseguito sotto Linux, Windows e Mac
+È scritto utilizzando le librerie Qt 6 (>= 6.5)  e può essere eseguito sotto Linux, Windows e Mac
 
 Ringraziamenti:
 

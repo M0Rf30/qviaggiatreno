@@ -22,8 +22,10 @@
 #ifndef QVIAGGIATRENO_H
 #define QVIAGGIATRENO_H
 
-#include <QtWidgets>
-#include <QtNetwork>
+#include <QMainWindow>
+#include <QMap>
+#include <QStringList>
+
 #include "config.h"
 
 class SchedaStazione;
@@ -34,6 +36,20 @@ class SchedaQViaggiaTreno;
 class DownloadViaggiaTreno;
 class DownloadTrenord;
 class QLedIndicator;
+class QAction;
+class QDialog;
+class QMenu;
+class QSpinBox;
+class QTabWidget;
+class QToolBar;
+class QCloseEvent;
+class QNetworkAccessManager;
+
+// i tipi restituiti dagli slot devono essere completi nel codice generato da moc
+Q_MOC_INCLUDE("schedastazione.h")
+Q_MOC_INCLUDE("schedatreno.h")
+Q_MOC_INCLUDE("schedalistatreni.h")
+Q_MOC_INCLUDE("schedaavvisitrenord.h")
 
 
 class QViaggiaTreno:public QMainWindow
@@ -42,7 +58,7 @@ class QViaggiaTreno:public QMainWindow
 
 public:
     QViaggiaTreno();
-    ~QViaggiaTreno();
+    ~QViaggiaTreno() override;
 
     //restituisce un puntatore al QNetworkAccessManager che è globale per l'applicazione
     QNetworkAccessManager* networkAccessManager() {return m_nam;}
@@ -64,7 +80,7 @@ public:
 
 protected:
 
-private slots:
+public Q_SLOTS:
     void about();
     void visualizzaLicenza();
     void nuovaStazione();
@@ -117,7 +133,7 @@ private:
     SchedaQViaggiaTreno * schedaCorrente();
     void impostaProxy();
 
-    void closeEvent(QCloseEvent *event);
+    void closeEvent(QCloseEvent *event) override;
 
     QMenu *m_viaggiatrenoMenu, *m_opzioniMenu, *m_helpMenu;
     QMenu *m_stazioneMenu, *m_trenoMenu, *m_listaTreniMenu;
@@ -150,8 +166,6 @@ private:
     //impostazioni
     Configurazione m_configurazione;
 
-    //numero di versione
-    static QString s_versione;
 };
 
 #endif

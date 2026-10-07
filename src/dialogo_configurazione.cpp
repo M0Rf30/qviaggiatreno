@@ -26,10 +26,10 @@ DialogoConfigurazione::DialogoConfigurazione(QViaggiaTreno* qvt) : QDialog(qvt)
     m_qvt = qvt;
     setupUi(this);
 
-    connect(buttonBox, SIGNAL(clicked(QAbstractButton*)), this, SLOT(pulsantePremuto(QAbstractButton*)));
-    connect(checkBoxUsareProxy, SIGNAL(clicked(bool)), this, SLOT(checkBoxUsareProxyCliccato(bool)));
-    connect(checkBoxAutenticazione, SIGNAL(clicked(bool)), this, SLOT(checkBoxAutenticazioneCliccato(bool)));
-    connect(checkBoxUsareProxySistema, SIGNAL(clicked(bool)), this, SLOT(checkBoxUsareProxySistemaCliccato(bool)));
+    connect(buttonBox, &QDialogButtonBox::clicked, this, &DialogoConfigurazione::pulsantePremuto);
+    connect(checkBoxUsareProxy, &QCheckBox::clicked, this, &DialogoConfigurazione::checkBoxUsareProxyCliccato);
+    connect(checkBoxAutenticazione, &QCheckBox::clicked, this, &DialogoConfigurazione::checkBoxAutenticazioneCliccato);
+    connect(checkBoxUsareProxySistema, &QCheckBox::clicked, this, &DialogoConfigurazione::checkBoxUsareProxySistemaCliccato);
 }
 
 //questo metodo legge i valori di configurazione ed imposta i corrispondenti controlli

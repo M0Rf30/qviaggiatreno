@@ -30,12 +30,12 @@ class DialogoConfigurazione: public QDialog, private Ui::dlgConfigurazione
 {
     Q_OBJECT
 public:
-    DialogoConfigurazione(QViaggiaTreno *qvt);
+    explicit DialogoConfigurazione(QViaggiaTreno *qvt);
 
     void impostaConfigurazione();
     void applicaConfigurazione();
 
-private slots:
+private Q_SLOTS:
     void pulsantePremuto(QAbstractButton* pulsante);
     void checkBoxAutenticazioneCliccato(bool selezionato);
     void checkBoxUsareProxyCliccato(bool selezionato);

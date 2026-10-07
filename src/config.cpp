@@ -20,7 +20,7 @@
 
 #include "config.h"
 
-Configurazione::Configurazione() : m_settings(QSettings::IniFormat, QSettings::UserScope, "fra74", "QViaggiaTreno")
+Configurazione::Configurazione() : m_settings()
 {
    //inizializzazione i valori di default
 
@@ -32,10 +32,10 @@ Configurazione::Configurazione() : m_settings(QSettings::IniFormat, QSettings::U
     m_def_usareProxy = false;
     m_def_autenticazioneProxyRichiesta = false;
     m_def_usareProxySistema = false;
-    m_def_hostProxy = QString::null;
+    m_def_hostProxy = QString();
     m_def_portaProxy = 65535;
-    m_def_nomeUtenteProxy = QString::null;
-    m_def_passwordProxy = QString::null;
+    m_def_nomeUtenteProxy = QString();
+    m_def_passwordProxy = QString();
 }
 
 int Configurazione::intervalloControlloVT()

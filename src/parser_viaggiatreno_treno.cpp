@@ -23,15 +23,29 @@
 #include <QApplication>
 #include <QPalette>
 
+namespace {
+
+// restituisce il testo del nodo i-esimo della lista, o una stringa vuota se l'indice non esiste
+QString testoNodo(const QList<QDomNode> &lista, int i)
+{
+    if (i < 0 || i >= lista.size())
+        return QString();
+    return lista.at(i).toText().data();
+}
+
+} // namespace
+
+// memorizza messaggio, riga e colonna dell'ultimo errore di analisi
+void ParserTrenoViaggiaTreno::impostaErrore(const QDomDocument::ParseResult &risultato)
+{
+    m_err = risultato.errorMessage;
+    m_riga = static_cast<int>(risultato.errorLine);
+    m_col = static_cast<int>(risultato.errorColumn);
+}
+
 ParserTrenoViaggiaTreno::ParserTrenoViaggiaTreno(SchedaQViaggiaTreno* scheda)
 {
-        m_scheda = scheda;
-        m_err = "";
-        m_riga = m_col = -1;
-    m_rispostaVTAnalizzata = "";
-    m_rispostaVTDettagli = "";
-    m_rispostaVTRiepilogo = "";
-
+    m_scheda = scheda;
 }
 
 void ParserTrenoViaggiaTreno::inizializza()
@@ -58,15 +72,13 @@ bool ParserTrenoViaggiaTreno::numeroTrenoAmbiguo() const
 QMap<QString, QString> ParserTrenoViaggiaTreno::listaCodiciTreno(const QString& rispostaVT)
 {
     QDomDocument docDom;
-    QString msg;
-    int riga, col;
     QMap<QString, QString> lista;
 
     //ottiene la lista di tutti gli elementi figli del tag "select"
     //ogni nodo è un elemento "option" che contiene il numero del treno seguito dall'origine
     //ad esempio "518 - NAPOLI CENTRALE" e nell'attributo "value" un codice ottenuto combinando
     //il numero del treno con il codice di origine della stazione, ad esempio "518;S09218";
-    docDom.setContent(rispostaVT, &msg, &riga, &col);
+    docDom.setContent(rispostaVT);
     QDomElement body = docDom.documentElement().firstChildElement("body");
     QDomElement corpocentrale = body.firstChildElement("div").nextSiblingElement("div");
     QDomElement form = corpocentrale.firstChildElement("form");
@@ -103,8 +115,12 @@ bool ParserTrenoViaggiaTreno::analizzaRiepilogo(TrenoVT::DatiTreno& orarioTreno)
 
     m_rispostaVTAnalizzata = m_rispostaVTRiepilogo;
 
-    if (!documentoDOM.setContent(m_rispostaVTAnalizzata, &m_err, &m_riga, &m_col))
+    const QDomDocument::ParseResult risultato = documentoDOM.setContent(m_rispostaVTAnalizzata);
+    if (!risultato)
+    {
+        impostaErrore(risultato);
         return false;
+    }
 
     //inizia l'analisi dell'albero DOM
     //rintraccia il tag body
@@ -163,9 +179,9 @@ bool ParserTrenoViaggiaTreno::analizzaRiepilogo(TrenoVT::DatiTreno& orarioTreno)
     if (listaNodi.isEmpty())
         return false;
 
-    orarioTreno.impostaDato(TrenoVT::dtBinarioPartenzaProgrammato, listaNodi.at(1).toText().data());
+    orarioTreno.impostaDato(TrenoVT::dtBinarioPartenzaProgrammato, testoNodo(listaNodi, 1));
     if (listaNodi.count() == 4)
-        orarioTreno.impostaDato(TrenoVT::dtBinarioPartenzaReale, listaNodi.at(3).toText().data());
+        orarioTreno.impostaDato(TrenoVT::dtBinarioPartenzaReale, testoNodo(listaNodi, 3));
     else
         orarioTreno.impostaDato(TrenoVT::dtBinarioPartenzaReale, div.firstChildElement("strong").text());
 
@@ -188,9 +204,9 @@ bool ParserTrenoViaggiaTreno::analizzaRiepilogo(TrenoVT::DatiTreno& orarioTreno)
         if (!t.isNull())
             listaNodi.append(n);
     }
-    orarioTreno.impostaDato(TrenoVT::dtBinarioArrivoProgrammato, listaNodi.at(1).toText().data());
+    orarioTreno.impostaDato(TrenoVT::dtBinarioArrivoProgrammato, testoNodo(listaNodi, 1));
     if (listaNodi.count() == 4)
-        orarioTreno.impostaDato(TrenoVT::dtBinarioArrivoReale, listaNodi.at(3).toText().data());
+        orarioTreno.impostaDato(TrenoVT::dtBinarioArrivoReale, testoNodo(listaNodi, 3));
     else
         orarioTreno.impostaDato(TrenoVT::dtBinarioArrivoReale, div.firstChildElement("strong").text());
 
@@ -254,8 +270,12 @@ bool ParserTrenoViaggiaTreno::analizzaDettagli(TrenoVT::DatiTreno& orarioTreno)
 
     m_rispostaVTAnalizzata = m_rispostaVTDettagli;
 
-    if (!documentoDOM.setContent(m_rispostaVTAnalizzata, &m_err, &m_riga, &m_col))
+    const QDomDocument::ParseResult risultato = documentoDOM.setContent(m_rispostaVTAnalizzata);
+    if (!risultato)
+    {
+        impostaErrore(risultato);
         return false;
+    }
 
     QDomElement body = documentoDOM.documentElement().firstChildElement("body");
     //ottiene la lista degli elementi div
@@ -265,6 +285,7 @@ bool ParserTrenoViaggiaTreno::analizzaDettagli(TrenoVT::DatiTreno& orarioTreno)
     //ci interessano solo gli elementi dal terzo al terz'ultimo
     for (int i = 2; i < elementiDiv.count()-2; i++)
     {
+        //la fermata passa sotto la responsabilità di orarioTreno (aggiungiFermata)
         TrenoVT::Fermata *fermata = new TrenoVT::Fermata();
         QDomElement div = elementiDiv.at(i).toElement();
         //verifica se la fermata è già stata effettuata o no, sfruttando l'attributo class
@@ -294,8 +315,8 @@ bool ParserTrenoViaggiaTreno::analizzaDettagli(TrenoVT::DatiTreno& orarioTreno)
         //se ci sono 4 elementi nella lista allora né binario previsto né reale sono scritti in grassetto
         if ( listaNodi.count() == 4)
         {
-            fermata->impostaBinarioProgrammato(listaNodi.at(1).toText().data().simplified());
-            fermata->impostaBinarioReale(listaNodi.at(3).toText().data().simplified());
+            fermata->impostaBinarioProgrammato(testoNodo(listaNodi, 1).simplified());
+            fermata->impostaBinarioReale(testoNodo(listaNodi, 3).simplified());
         }
 
         //ce ne sono 3 allora le possibilità sono varie
@@ -303,22 +324,22 @@ bool ParserTrenoViaggiaTreno::analizzaDettagli(TrenoVT::DatiTreno& orarioTreno)
         else
             if (fermata->effettuata())
             {
-                fermata->impostaBinarioProgrammato(listaNodi.at(1).toText().data().simplified());
+                fermata->impostaBinarioProgrammato(testoNodo(listaNodi, 1).simplified());
                 fermata->impostaBinarioReale(div.firstChildElement("strong").text().simplified());
             }
         //oppure la fermata non è stata effettuata
         else
             //è indicato in grassetto il binario reale (evento raro ma succede)
-            if (listaNodi.at(2).toText().data().contains("Binario"))
+            if (testoNodo(listaNodi, 2).contains("Binario"))
             {
-                fermata->impostaBinarioProgrammato(listaNodi.at(1).toText().data().simplified());
+                fermata->impostaBinarioProgrammato(testoNodo(listaNodi, 1).simplified());
                 fermata->impostaBinarioReale(div.firstChildElement("strong").text().simplified());
             }
             //è indicato in grassetto il binario programmato
             else
             {
                 fermata->impostaBinarioProgrammato(div.firstChildElement("strong").text().simplified());
-                fermata->impostaBinarioReale(listaNodi.at(2).toText().data().simplified());
+                fermata->impostaBinarioReale(testoNodo(listaNodi, 2).simplified());
             }
 
     orarioTreno.aggiungiFermata(fermata);
@@ -336,32 +357,13 @@ void TrenoVT::DatiTreno::inizializza()
 
 }
 
-TrenoVT::Fermata::Fermata()
-{
-        m_effettuata = false;
-        m_soppressa = false;
+TrenoVT::Fermata::Fermata() = default;
 
-        m_fermata = "";
-        m_binProgrammato = "";
-        m_binReale = "";
-        m_oraArrivoProgrammata = "";
-        m_oraArrivoReale = "";
-        m_oraArrivoStimata = "";
-}
-
-TrenoVT::Transito::Transito()
-{
-        m_ritardo = 0;
-        m_localita = "";
-        m_orarioTransito = "";
-}
+TrenoVT::Transito::Transito() = default;
 
 ListaVT::DatiTreno::DatiTreno(const QString& numero)
 {
     m_numero = numero;
-    m_codice = "";
-
-    m_stato = TrenoVT::DatiSconosciuti;
 }
 
 //cancella tutti i dati del treno tranne numero
@@ -399,8 +401,12 @@ bool ParserTrenoViaggiaTreno::analizzaRiepilogoPerLista(ListaVT::DatiTreno &tren
 
     //analizza il testo della risposta di viaggiatreno
     m_rispostaVTAnalizzata = m_rispostaVTRiepilogo;
-    if (!documentoDOM.setContent(m_rispostaVTAnalizzata, &m_err, &m_riga, &m_col ))
+    const QDomDocument::ParseResult risultato = documentoDOM.setContent(m_rispostaVTAnalizzata);
+    if (!risultato)
+    {
+        impostaErrore(risultato);
         return false;
+    }
 
     //inizia l'analisi dell'albero DOM
     //rintraccia il tag body
@@ -424,121 +430,121 @@ bool ParserTrenoViaggiaTreno::analizzaRiepilogoPerLista(ListaVT::DatiTreno &tren
 
 
     //rintraccia l'elemento DIV con i dati della stazione di partenza
+    for (int i = 0; i < elementiDiv.count(); i++)
+        if (elementiDiv.at(i).toElement().text().contains("Partenza"))
+            div = elementiDiv.at(i).toElement();
+
+    //estrai i dati sulla stazione di partenza dall'elemento appena ottenuto
+    treno.impostaDato(ListaVT::dtOrigine, div.firstChildElement("h2").text());
+    treno.impostaDato(ListaVT::dtPartenzaProgrammata, div.firstChildElement("p").firstChildElement("strong").text());
+    //non cercare l'orario di partenza effettivo se il treno risulta non ancora partito
+    if (!m_rispostaVTAnalizzata.contains("ancora partito"))
+        treno.impostaDato(ListaVT::dtPartenzaEffettiva, div.firstChildElement("p").nextSiblingElement("p")
+                           .firstChildElement("strong").text());
+
+    //rintraccia l'elemento DIV con i dati della stazione di arrivo
+    for (int i = 0; i < elementiDiv.count(); i++)
+        if (elementiDiv.at(i).toElement().text().contains("Arrivo"))
+            div = elementiDiv.at(i).toElement();
+
+    //estrai i dati sulla stazione di arrivo dall'elemento appena ottenuto
+    treno.impostaDato(ListaVT::dtDestinazione, div.firstChildElement("h2").text());
+    treno.impostaDato(ListaVT::dtArrivoProgrammato, div.firstChildElement("p").firstChildElement("strong").text());
+    //cerca l'orario di arrivo effettivo solo se il treno risulta già arrivato
+    if (m_rispostaVTAnalizzata.contains("arrivato"))
+        treno.impostaDato(ListaVT::dtArrivoEffettivo, div.firstChildElement("p").nextSiblingElement("p")
+                           .firstChildElement("strong").text());
+
+    //cerca solo per i treni ancora in viaggio il dato sull'ultima fermata effettuata
+    if (m_rispostaVTAnalizzata.contains("viaggia "))
+    {
+        idx = -1;
         for (int i = 0; i < elementiDiv.count(); i++)
-            if (elementiDiv.at(i).toElement().text().contains("Partenza"))
-                div = elementiDiv.at(i).toElement();
+            if (elementiDiv.at(i).toElement().text().contains("Ultima fermata effettuata"))
+                idx = i+1;
+        //è stata trovato? allora estrai i dati
+        if (idx != -1)
+        {
+            div = elementiDiv.at(idx).toElement();
 
-        //estrai i dati sulla stazione di partenza dall'elemento appena ottenuto
-        treno.impostaDato(ListaVT::dtOrigine, div.firstChildElement("h2").text());
-        treno.impostaDato(ListaVT::dtPartenzaProgrammata, div.firstChildElement("p").firstChildElement("strong").text());
-        //non cercare l'orario di partenza effettivo se il treno risulta non ancora partito
-        if (!m_rispostaVTAnalizzata.contains("ancora partito"))
-            treno.impostaDato(ListaVT::dtPartenzaEffettiva, div.firstChildElement("p").nextSiblingElement("p")
+            treno.impostaDato(ListaVT::dtUltimaFermata, div.firstChildElement("h2").text());
+            treno.impostaDato(ListaVT::dtOrarioFermataProgrammato, div.firstChildElement("p").firstChildElement("strong").text());
+            treno.impostaDato(ListaVT::dtOrarioFermataEffettivo, div.firstChildElement("p").nextSiblingElement("p")
                                .firstChildElement("strong").text());
+        }
+    }
 
-        //rintraccia l'elemento DIV con i dati della stazione di arrivo
+    //cerca il ritardo in arrivo per un treno già arrivato
+    if (m_rispostaVTAnalizzata.contains("arrivato"))
+    {
+        idx = -1;
         for (int i = 0; i < elementiDiv.count(); i++)
-            if (elementiDiv.at(i).toElement().text().contains("Arrivo"))
-                div = elementiDiv.at(i).toElement();
-
-        //estrai i dati sulla stazione di arrivo dall'elemento appena ottenuto
-        treno.impostaDato(ListaVT::dtDestinazione, div.firstChildElement("h2").text());
-        treno.impostaDato(ListaVT::dtArrivoProgrammato, div.firstChildElement("p").firstChildElement("strong").text());
-        //cerca l'orario di arrivo effettivo solo se il treno risulta già arrivato
-        if (m_rispostaVTAnalizzata.contains("arrivato"))
-            treno.impostaDato(ListaVT::dtArrivoEffettivo, div.firstChildElement("p").nextSiblingElement("p")
-                               .firstChildElement("strong").text());
-
-        //cerca solo per i treni ancora in viaggio il dato sull'ultima fermata effettuata
-        if (m_rispostaVTAnalizzata.contains("viaggia "))
+            if (elementiDiv.at(i).toElement().text().contains("Il treno e' arrivato"))
+                idx = i;
+        if (idx != -1)
         {
-            idx = -1;
-            for (int i = 0; i < elementiDiv.count(); i++)
-                if (elementiDiv.at(i).toElement().text().contains("Ultima fermata effettuata"))
-                    idx = i+1;
-            //è stata trovato? allora estrai i dati
-            if (idx != -1)
+            div = elementiDiv.at(idx).toElement();
+            //il treno è arrivato in orario, non c'è ragione di estrarre il ritardo
+            if (div.text().contains("orario"))
+                treno.impostaDato(ListaVT::dtRitardoTransito, QString::fromUtf8("In orario"));
+            else
             {
-                div = elementiDiv.at(idx).toElement();
+                QString minuti = div.text().section(' ', 6, 6);
+                QString ritOAnticipo = div.text().section(' ', 9, 9);
+                if (minuti == "1")
+                    temp = QString::fromUtf8("1 minuto in %1").arg(ritOAnticipo);
+                else
+                    temp = QString::fromUtf8("%1 minuti in %2").arg(minuti).arg(ritOAnticipo);
 
-                treno.impostaDato(ListaVT::dtUltimaFermata, div.firstChildElement("h2").text());
-                treno.impostaDato(ListaVT::dtOrarioFermataProgrammato, div.firstChildElement("p").firstChildElement("strong").text());
-                treno.impostaDato(ListaVT::dtOrarioFermataEffettivo, div.firstChildElement("p").nextSiblingElement("p")
-                                   .firstChildElement("strong").text());
+                treno.impostaDato(ListaVT::dtRitardoTransito, temp);
             }
         }
+    }
 
-        //cerca il ritardo in arrivo per un treno già arrivato
-        if (m_rispostaVTAnalizzata.contains("arrivato"))
+    //cerca il ritardo per i treni ancora in viaggio
+    if (m_rispostaVTAnalizzata.contains("viaggia "))
+    {
+        idx = -1;
+        for (int i = 0; i < elementiDiv.count(); i++)
+            if (elementiDiv.at(i).toElement().text().contains("Il treno viaggia"))
+                idx = i;
+
+
+        if (idx != -1)
         {
-            idx = -1;
-            for (int i = 0; i < elementiDiv.count(); i++)
-                if (elementiDiv.at(i).toElement().text().contains("Il treno e' arrivato"))
-                    idx = i;
-            if (idx != -1)
+            QString ritardo, transito;
+            div = elementiDiv.at(idx).toElement();
+            temp = div.firstChildElement("strong").text();
+            idx = temp.indexOf("Ultimo");
+            if (idx == -1)
             {
-                div = elementiDiv.at(idx).toElement();
-                //il treno è arrivato in orario, non c'è ragione di estrarre il ritardo
-                if (div.text().contains("orario"))
-                    treno.impostaDato(ListaVT::dtRitardoTransito, QString::fromUtf8("In orario"));
-                else
-                {
-                    QString minuti = div.text().section(' ', 6, 6);
-                    QString ritOAnticipo = div.text().section(' ', 9, 9);
-                    if (minuti == "1")
-                        temp = QString::fromUtf8("1 minuto in %1").arg(ritOAnticipo);
-                    else
-                        temp = QString::fromUtf8("%1 minuti in %2").arg(minuti).arg(ritOAnticipo);
+                ritardo = temp;
+                transito = "";
+            }
+            else
+            {
+                ritardo = temp.left(idx);
+                transito = temp.mid(idx);
+            }
 
-                    treno.impostaDato(ListaVT::dtRitardoTransito, temp);
-                }
+            //esistono i dati sull'ora e la località dell'ultimo transito
+            if (transito != "")
+            {
+                treno.impostaDato(ListaVT::dtOrarioTransito, transito.section(' ', -2, -2));
+                treno.impostaDato(ListaVT::dtUltimoRilevamento, transito.section(' ', 3, -5));
+            }
+
+            if (ritardo.contains("orario"))
+                treno.impostaDato(ListaVT::dtRitardoTransito, QString::fromUtf8("in orario"));
+            else
+            {
+                temp = ritardo.section(' ', 5, 5);
+                if (temp == "1")
+                    treno.impostaDato(ListaVT::dtRitardoTransito, QString::fromUtf8("1 minuto in %1").arg(ritardo.section(' ', 8, 8)));
+                else
+                    treno.impostaDato(ListaVT::dtRitardoTransito, QString::fromUtf8("%1 minuti in %2").arg(temp).arg(ritardo.section(' ', 8, 8)));
             }
         }
-
-        //cerca il ritardo per i treni ancora in viaggio
-        if (m_rispostaVTAnalizzata.contains("viaggia "))
-        {
-            idx = -1;
-            for (int i = 0; i < elementiDiv.count(); i++)
-                if (elementiDiv.at(i).toElement().text().contains("Il treno viaggia"))
-                    idx = i;
-
-
-            if (idx != -1)
-            {
-                QString ritardo, transito;
-                div = elementiDiv.at(idx).toElement();
-                temp = div.firstChildElement("strong").text();
-                idx = temp.indexOf("Ultimo");
-                if (idx == -1)
-                {
-                    ritardo = temp;
-                    transito = "";
-                }
-                else
-                {
-                    ritardo = temp.left(idx);
-                    transito = temp.mid(idx);
-                }
-
-                //esistono i dati sull'ora e la località dell'ultimo transito
-                if (transito != "")
-                {
-                    treno.impostaDato(ListaVT::dtOrarioTransito, transito.section(' ', -2, -2));
-                    treno.impostaDato(ListaVT::dtUltimoRilevamento, transito.section(' ', 3, -5));
-                }
-
-                if (ritardo.contains("orario"))
-                    treno.impostaDato(ListaVT::dtRitardoTransito, QString::fromUtf8("in orario"));
-                else
-                {
-                    temp = ritardo.section(' ', 5, 5);
-                    if (temp == "1")
-                        treno.impostaDato(ListaVT::dtRitardoTransito, QString::fromUtf8("1 minuto in %1").arg(ritardo.section(' ', 8, 8)));
-                    else
-                        treno.impostaDato(ListaVT::dtRitardoTransito, QString::fromUtf8("%1 minuti in %2").arg(temp).arg(ritardo.section(' ', 8, 8)));
-                }
-            }
-        }
-        return true;
+    }
+    return true;
 }

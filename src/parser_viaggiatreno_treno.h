@@ -22,8 +22,11 @@
 #ifndef PARSER_VIAGGIATRENO_TRENO_H
 #define PARSER_VIAGGIATRENO_TRENO_H
 
-#include <QtXml>
-#include <QColor>
+#include <QDomDocument>
+#include <QList>
+#include <QMap>
+#include <QString>
+#include <memory>
 
 #include "parser_viaggiatreno_base.h"
 
@@ -68,7 +71,7 @@ private:
     QString m_fermata;
     QString m_binProgrammato, m_binReale;
     QString m_oraArrivoProgrammata, m_oraArrivoStimata, m_oraArrivoReale;
-    bool m_effettuata, m_soppressa;
+    bool m_effettuata = false, m_soppressa = false;
 };
 
 class Transito
@@ -88,13 +91,13 @@ public:
 private:
     QString m_localita;
     QString m_orarioTransito;
-    int m_ritardo;
+    int m_ritardo = 0;
 };
 
 class DatiTreno
 {
 public:
-    DatiTreno() {m_statoTreno = DatiSconosciuti;}
+    DatiTreno() = default;
 
     void impostaStatoTreno(StatoTreno stato) {m_statoTreno = stato;}
     StatoTreno statoTreno() const {return m_statoTreno;}
@@ -110,19 +113,28 @@ public:
     void impostaDato(Dati tipoDato, const QString& valore) {m_dati[tipoDato] = valore; }
     QString dato(Dati tipoDato) const {return m_dati[tipoDato]; }
 
-    QList<Fermata*> fermate() const {return m_fermate;}
-    void aggiungiFermata(Fermata* f) {m_fermate.append(f);}
+    //le fermate sono condivise tra le copie di DatiTreno e vengono eliminate con l'ultima copia
+    QList<Fermata*> fermate() const
+    {
+        QList<Fermata*> lista;
+        lista.reserve(m_fermate.size());
+        for (const std::shared_ptr<Fermata>& f : m_fermate)
+            lista.append(f.get());
+        return lista;
+    }
+    //prende possesso della fermata
+    void aggiungiFermata(Fermata* f) {m_fermate.append(std::shared_ptr<Fermata>(f));}
 
 private:
-    StatoTreno m_statoTreno;
+    StatoTreno m_statoTreno = DatiSconosciuti;
     //il numero treno contiene *anche* la categoria
     QString m_numero;
     QString m_categoria;
     QMap<int, QString> m_dati;
-    QList<Fermata*> m_fermate;
+    QList<std::shared_ptr<Fermata>> m_fermate;
 
 };
-};
+}
 
 namespace ListaVT
 {
@@ -160,16 +172,16 @@ private:
     QString m_numero, m_codice;
     QMap<Dati, QString> m_dati;
 
-    TrenoVT::StatoTreno m_stato;
+    TrenoVT::StatoTreno m_stato = TrenoVT::DatiSconosciuti;
 };
-};
+}
 
 
 class ParserTrenoViaggiaTreno: public ParserViaggiaTrenoBase
 {
     Q_OBJECT
 public:
-    ParserTrenoViaggiaTreno(SchedaQViaggiaTreno *scheda);
+    explicit ParserTrenoViaggiaTreno(SchedaQViaggiaTreno *scheda);
 
     void inizializza();
 
@@ -216,9 +228,11 @@ public:
 
 
 private:
-    SchedaQViaggiaTreno *m_scheda;
+    void impostaErrore(const QDomDocument::ParseResult &risultato);
+
+    SchedaQViaggiaTreno *m_scheda = nullptr;
     QString m_rispostaVTDettagli, m_rispostaVTRiepilogo, m_rispostaVTAnalizzata;
-    int m_riga, m_col;
+    int m_riga = -1, m_col = -1;
     QString m_err;
 };
 

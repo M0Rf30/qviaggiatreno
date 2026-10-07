@@ -1,0 +1,56 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: ${{ matrix.distro.name }}
+    runs-on: ubuntu-latest
+    container: ${{ matrix.distro.image }}
+    strategy:
+      fail-fast: false
+      matrix:
+        distro:
+          - name: Debian trixie (Qt 6.8)
+            image: debian:trixie
+            deps: >-
+              apt-get update &&
+              apt-get install -y --no-install-recommends
+              ca-certificates cmake g++ make qt6-base-dev qt6-base-dev-tools
+          - name: Arch Linux (latest Qt)
+            image: archlinux:latest
+            deps: >-
+              pacman -Syu --noconfirm --needed
+              cmake gcc make qt6-base
+
+    env:
+      QT_QPA_PLATFORM: offscreen
+
+    steps:
+      - name: Install dependencies
+        run: ${{ matrix.distro.deps }}
+
+      - uses: actions/checkout@v4
+
+      - name: Configure
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_COMPILE_WARNING_AS_ERROR=ON
+
+      - name: Build
+        run: cmake --build build --parallel
+
+      - name: Test
+        run: ctest --test-dir build --output-on-failure
+
+      - name: Install
+        run: DESTDIR="$PWD/stage" cmake --install build

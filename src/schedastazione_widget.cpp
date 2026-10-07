@@ -20,6 +20,14 @@
 
 #include "schedastazione.h"
 
+#include <QComboBox>
+#include <QHBoxLayout>
+#include <QHeaderView>
+#include <QLabel>
+#include <QPushButton>
+#include <QTableView>
+#include <QVBoxLayout>
+
 //questo widget si occupa di presentare all'utente una lista delle stazioni proposte da viaggiatreno per
 //risolvere l'ambiguità del nome inserito dall'utente
 WidgetDisambiguaNome::WidgetDisambiguaNome(SchedaStazione* parent, QMap<QString, QString> listaCodiciStazioni) : QWidget(parent)
@@ -60,8 +68,8 @@ WidgetDisambiguaNome::WidgetDisambiguaNome(SchedaStazione* parent, QMap<QString,
         listaNomi->setCurrentRow(0);
 
         //connessioni
-        connect(btnSceltaStazione, SIGNAL(clicked()), this, SLOT(sceltaNomeStazione()));
-        connect(this, SIGNAL(nomeDisambiguato(const QString&)), parent, SLOT(cambiaCodiceStazione(const QString&)));
+        connect(btnSceltaStazione, &QPushButton::clicked, this, &WidgetDisambiguaNome::sceltaNomeStazione);
+        connect(this, &WidgetDisambiguaNome::nomeDisambiguato, parent, &SchedaStazione::cambiaCodiceStazione);
 }
 
 //slot
@@ -82,7 +90,7 @@ WidgetStazione::WidgetStazione(QWidget *parent, QAbstractItemModel *modelloArriv
     //non è possibile farlo direttamente in designer
     QFont font = labelTitolo->font();
     font.setBold(true);
-        font.setPointSize(font.pointSize()*1.5);
+        font.setPointSize(qRound(font.pointSize()*1.5));
     labelTitolo->setFont(font);
 
     tabellaArrivi->setModel(modelloArrivi);
@@ -98,20 +106,22 @@ WidgetStazione::WidgetStazione(QWidget *parent, QAbstractItemModel *modelloArriv
     tabellaPartenze->horizontalHeader()->setMouseTracking(true);
 
 
-    connect (tabellaArrivi, SIGNAL(entered(QModelIndex)), this,
-             SLOT(mouseEntered(const QModelIndex&)));
-    connect (tabellaPartenze, SIGNAL(entered(QModelIndex)), this,
-             SLOT(mouseEntered(const QModelIndex&)));
+    connect(tabellaArrivi, &QTableView::entered, this, &WidgetStazione::mouseEntered);
+    connect(tabellaPartenze, &QTableView::entered, this, &WidgetStazione::mouseEntered);
 
-    connect (tabellaArrivi, SIGNAL(activated(QModelIndex)), parent,
-             SLOT(itemAttivato(const QModelIndex&)));
-    connect(tabellaPartenze, SIGNAL(activated(QModelIndex)), parent,
-            SLOT(itemAttivato(const QModelIndex&)));
+    //la scheda stazione è il parent: ad essa sono collegati gli slot per filtri e attivazione celle
+    SchedaStazione* scheda = qobject_cast<SchedaStazione*>(parent);
+    if (!scheda)
+        return;
 
-    connect(comboBoxTipoFiltroArrivi, SIGNAL(currentIndexChanged(int)), parent, SLOT(tipoFiltroArriviSelezionato(int)));
-    connect(comboBoxTipoFiltroPartenze, SIGNAL(currentIndexChanged(int)), parent, SLOT(tipoFiltroPartenzeSelezionato(int)));
-    connect(comboBoxFiltroArrivi, SIGNAL(activated(QString)), parent, SLOT(filtroArriviSelezionato(QString)));
-    connect(comboBoxFiltroPartenze, SIGNAL(activated(QString)), parent, SLOT(filtroPartenzeSelezionato(QString)));
+    connect(tabellaArrivi, &QTableView::activated, scheda, &SchedaStazione::itemAttivato);
+    connect(tabellaPartenze, &QTableView::activated, scheda, &SchedaStazione::itemAttivato);
+
+    connect(comboBoxTipoFiltroArrivi, qOverload<int>(&QComboBox::currentIndexChanged), scheda, &SchedaStazione::tipoFiltroArriviSelezionato);
+    connect(comboBoxTipoFiltroPartenze, qOverload<int>(&QComboBox::currentIndexChanged), scheda, &SchedaStazione::tipoFiltroPartenzeSelezionato);
+    //in Qt6 activated(QString) non esiste più: si usa textActivated
+    connect(comboBoxFiltroArrivi, &QComboBox::textActivated, scheda, &SchedaStazione::filtroArriviSelezionato);
+    connect(comboBoxFiltroPartenze, &QComboBox::textActivated, scheda, &SchedaStazione::filtroPartenzeSelezionato);
 
 }
 
@@ -143,7 +153,7 @@ QWidget* SchedaStazione::creaWidgetErroreNome()
         " da ViaggiaTreno. Premete il pulsante sottostante per modificare il nome della stazione, "
         "oppure il pulsante di chiusura se desiderate semplicemente chiudere questa scheda").arg(nomeStazione()));
     QPushButton *btnCambiaNome = new QPushButton(QString::fromUtf8("Cambia nome"), this);
-    connect(btnCambiaNome, SIGNAL(clicked()), this, SLOT(modificaNomeStazione()));
+    connect(btnCambiaNome, &QPushButton::clicked, this, &SchedaStazione::modificaNomeStazione);
     vbox->addWidget(labelErrore);
     vbox->addWidget(btnCambiaNome, 0, Qt::AlignCenter);
     vbox->addStretch();

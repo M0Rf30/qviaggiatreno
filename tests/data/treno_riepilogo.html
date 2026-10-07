@@ -1,0 +1,28 @@
+<html>
+<head>
+<title>Treno</title>
+<!--
+Struttura attesa da ParserTrenoViaggiaTreno::analizzaRiepilogo / analizzaRiepilogoPerLista:
+html/body
+  h1: "CATEGORIA NUMERO"
+  div (style contenente B02D2D): provvedimenti
+  div contenente "Partenza": h2, p/strong (orario programmato), p/strong (orario reale),
+      poi nodi di testo diretti: "Binario", BIN programmato, "Reale", BIN reale
+      (se i nodi di testo sono 3 il binario reale e' in uno strong figlio diretto)
+  div contenente "Arrivo": stessa struttura
+  div contenente "Ultima fermata effettuata" seguito da un div con h2 e due p/strong
+  div con la frase del ritardo: strong con "Il treno ... N minuti in ritardo Ultimo rilevamento a LOCALITA alle ore HH:MM ."
+  (la sesta parola e' il numero di minuti, la nona indica ritardo o anticipo)
+Lo stato del treno e' dedotto da alcune frasi cercate nel testo dell'intera pagina.
+-->
+</head>
+<body>
+<h1>REG 2345</h1>
+<div style="color:#B02D2D">Sciopero in corso</div>
+<div><h2>Partenza: MILANO CENTRALE</h2><p>Programmata: <strong>10:15</strong></p><p>Effettiva: <strong>10:17</strong></p>Binario<br/>5<br/>Reale<br/>5</div>
+<div><h2>Arrivo: BRESCIA</h2><p>Programmato: <strong>11:30</strong></p><p>Stimato: <strong>11:35</strong></p>Binario<br/>5<br/>Reale <strong>6</strong></div>
+<div>Ultima fermata effettuata:</div>
+<div><h2>ROGOREDO</h2><p>Programmata: <strong>10:24</strong></p><p>Effettiva: <strong>10:25</strong></p></div>
+<div><strong>Il treno viaggia con un 5 minuti in ritardo Ultimo rilevamento a ROGOREDO alle ore 10:25 .</strong></div>
+</body>
+</html>

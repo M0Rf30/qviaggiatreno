@@ -18,22 +18,57 @@
  *   59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.             *
  ***************************************************************************/
 
-#include "qviaggiatreno.h"
 #include "download_viaggiatreno.h"
+#include "qviaggiatreno.h"
 #include "schedaviaggiatreno.h"
 
+#include <QCoreApplication>
+#include <QNetworkReply>
+#include <QNetworkRequest>
+#include <QTimer>
+#include <QUrl>
+#include <QUrlQuery>
+
+namespace {
+//indirizzo base del servizio mobile di ViaggiaTreno
+const QString s_urlBaseVT = QStringLiteral("http://mobile.viaggiatreno.it/vt_pax_internet/mobile");
+//timeout (in ms) delle richieste di download dati
+const int s_timeoutRichiesta = 30000;
+
+//costruisce un corpo application/x-www-form-urlencoded (valori in UTF-8, percent-encoded, spazio come '+')
+QByteArray corpoForm(const QList<QPair<QString, QString>>& parametri)
+{
+    QByteArray corpo;
+    for (const auto& p : parametri)
+    {
+        if (!corpo.isEmpty())
+            corpo += '&';
+        corpo += QUrl::toPercentEncoding(p.first).replace("%20", "+");
+        corpo += '=';
+        corpo += QUrl::toPercentEncoding(p.second).replace("%20", "+");
+    }
+    return corpo;
+}
+
+//imposta intestazioni e timeout comuni a tutte le richieste dati
+void impostaRichiesta(QNetworkRequest& request, const QUrl& url, QObject* item)
+{
+    request.setUrl(url);
+    request.setHeader(QNetworkRequest::UserAgentHeader,
+                      QStringLiteral("QViaggiaTreno/") + QCoreApplication::applicationVersion());
+    request.setTransferTimeout(s_timeoutRichiesta);
+    request.setOriginatingObject(item);
+}
+}
 
 DownloadViaggiaTreno::DownloadViaggiaTreno(QViaggiaTreno* qvt, QNetworkAccessManager *nam)
+    : m_qvt(qvt), m_nam(nam)
 {
-    m_nam = nam;
-    m_qvt = qvt;
-
     //crea e connette i timer
     m_timerDownload = new QTimer(this);
     m_timerControlloVT = new QTimer(this);
-    connect(m_timerControlloVT, SIGNAL(timeout()), this, SLOT(controllaViaggiaTreno()));
-    connect(m_timerDownload, SIGNAL(timeout()), this, SLOT(download()));
-
+    connect(m_timerControlloVT, &QTimer::timeout, this, &DownloadViaggiaTreno::controllaViaggiaTreno);
+    connect(m_timerDownload, &QTimer::timeout, this, &DownloadViaggiaTreno::download);
 }
 
 QString DownloadViaggiaTreno::correggiOutputVT(QString testoVT)
@@ -61,7 +96,7 @@ QString DownloadViaggiaTreno::correggiOutputVT(QString testoVT)
 void DownloadViaggiaTreno::download()
 {
     // se non ci sono richieste in coda esce immediatamente
-    if (!m_codaDownload.count())
+    if (m_codaDownload.isEmpty())
         return;
 
     //altrimenti prende il primo elemento in coda
@@ -76,14 +111,16 @@ void DownloadViaggiaTreno::download()
         case RiepilogoTreno: richiestaHTTPRiepilogoTreno(item); break;
         case RiepilogoTrenoConOrigine: richiestaHTTPRiepilogoTrenoConOrigine(item); break;
         case DettagliTreno: richiestaHTTPDettagliTreno(item); break;
-        case DettagliTrenoConOrigine: richiestaHTTPDettagliTrenoConOrigine(item);
+        case DettagliTrenoConOrigine: richiestaHTTPDettagliTrenoConOrigine(item); break;
         }
 }
 
 // slot richiamati dalle schede per mettere in coda un download
+//gli item in coda hanno come parent il downloader, così vengono liberati alla sua distruzione
 void DownloadViaggiaTreno::downloadStazione(quint32 idScheda, const QString &nomeStazione)
 {
     DownloadViaggiaTrenoItem *item = new DownloadViaggiaTrenoItem(idScheda, StazioneConNome);
+    item->setParent(this);
     item->impostaDato("NomeStazione", nomeStazione);
 
     m_codaDownload.enqueue(item);
@@ -92,6 +129,7 @@ void DownloadViaggiaTreno::downloadStazione(quint32 idScheda, const QString &nom
 void DownloadViaggiaTreno::downloadStazioneCodice(quint32 idScheda, const QString &codiceStazione)
 {
     DownloadViaggiaTrenoItem *item = new DownloadViaggiaTrenoItem(idScheda, StazioneConCodice);
+    item->setParent(this);
     item->impostaDato("CodiceStazione", codiceStazione);
 
     m_codaDownload.enqueue(item);
@@ -100,6 +138,7 @@ void DownloadViaggiaTreno::downloadStazioneCodice(quint32 idScheda, const QStrin
 void DownloadViaggiaTreno::downloadRiepilogoTreno(quint32 idScheda, const QString &numero)
 {
     DownloadViaggiaTrenoItem *item = new DownloadViaggiaTrenoItem(idScheda, RiepilogoTreno);
+    item->setParent(this);
     item->impostaDato("Numero", numero);
 
     m_codaDownload.enqueue(item);
@@ -108,6 +147,7 @@ void DownloadViaggiaTreno::downloadRiepilogoTreno(quint32 idScheda, const QStrin
 void DownloadViaggiaTreno::downloadRiepilogoTreno(quint32 idScheda, const QString &numero, const QString &codiceStazOrigine)
 {
     DownloadViaggiaTrenoItem *item = new DownloadViaggiaTrenoItem(idScheda, RiepilogoTrenoConOrigine);
+    item->setParent(this);
     item->impostaDato("Numero", numero);
     item->impostaDato("CodiceStazione", codiceStazOrigine );
 
@@ -117,6 +157,7 @@ void DownloadViaggiaTreno::downloadRiepilogoTreno(quint32 idScheda, const QStrin
 void DownloadViaggiaTreno::downloadDettagliTreno(quint32 idScheda, const QString &numero)
 {
     DownloadViaggiaTrenoItem * item = new DownloadViaggiaTrenoItem(idScheda, DettagliTreno);
+    item->setParent(this);
     item->impostaDato("Numero", numero);
 
     m_codaDownload.enqueue(item);
@@ -125,6 +166,7 @@ void DownloadViaggiaTreno::downloadDettagliTreno(quint32 idScheda, const QString
 void DownloadViaggiaTreno::downloadDettagliTreno(quint32 idScheda, const QString &numero, const QString &codiceStazOrigine)
 {
     DownloadViaggiaTrenoItem * item = new DownloadViaggiaTrenoItem(idScheda, DettagliTrenoConOrigine);
+    item->setParent(this);
     item->impostaDato("Numero", numero);
     item->impostaDato("CodiceStazione", codiceStazOrigine );
 
@@ -141,100 +183,70 @@ DownloadViaggiaTrenoItem::DownloadViaggiaTrenoItem(quint32 idScheda, TipoSchedaV
     m_dataEOra = QDateTime::currentDateTime();
 }
 
+//invia una richiesta POST con corpo form-urlencoded e collega la risposta a downloadEffettuato
+void DownloadViaggiaTreno::inviaPost(DownloadViaggiaTrenoItem *item, const QString& percorso,
+                                     const QList<QPair<QString, QString>>& parametri)
+{
+    QNetworkRequest request;
+    impostaRichiesta(request, QUrl(s_urlBaseVT + percorso), item);
+    request.setHeader(QNetworkRequest::ContentTypeHeader, QStringLiteral("application/x-www-form-urlencoded"));
+    QNetworkReply *reply = m_nam->post(request, corpoForm(parametri));
+    connect(reply, &QNetworkReply::finished, this, &DownloadViaggiaTreno::downloadEffettuato);
+}
+
+//invia una richiesta GET e collega la risposta a downloadEffettuato
+void DownloadViaggiaTreno::inviaGet(DownloadViaggiaTrenoItem *item, const QString& indirizzo)
+{
+    QNetworkRequest request;
+    impostaRichiesta(request, QUrl(indirizzo), item);
+    QNetworkReply *reply = m_nam->get(request);
+    connect(reply, &QNetworkReply::finished, this, &DownloadViaggiaTreno::downloadEffettuato);
+}
 
 //invia richiesta HTTP al server di ViaggiaTreno per ottenere la scheda della stazione, fornendo come parametro il nome della stazione
 void DownloadViaggiaTreno::richiestaHTTPStazioneConNome(DownloadViaggiaTrenoItem *item)
 {
-    QNetworkRequest request;
-    QString dati;
-
-
-    dati = QString("stazione=%1").arg(item->dato("NomeStazione"));
-    dati.replace(" ", "+");
-   // request.setUrl(QUrl("http://mobile.viaggiatreno.it/viaggiatreno/mobile/stazione?lang=IT"));
-     request.setUrl(QUrl("http://mobile.viaggiatreno.it/vt_pax_internet/mobile/stazione?lang=IT"));
-    request.setRawHeader("Content-type", "application/x-www-form-urlencoded");
-    request.setOriginatingObject(item);
-    QNetworkReply *reply = m_nam->post(request, dati.toUtf8());
-    connect(reply, SIGNAL(finished()), this, SLOT(downloadEffettuato()));
+    inviaPost(item, QStringLiteral("/stazione?lang=IT"), {{QStringLiteral("stazione"), item->dato("NomeStazione")}});
 }
 
 //invia richiesta HTTP al server di ViaggiaTreno per ottenere la scheda della stazione, fornendo come parametro il codice della stazione
 void DownloadViaggiaTreno::richiestaHTTPStazioneConCodice(DownloadViaggiaTrenoItem *item)
 {
-    QNetworkRequest request;
-    QString dati;
-
-
-    dati = QString("codiceStazione=%1").arg(item->dato("CodiceStazione"));
-    dati.replace(" ", "+");
-    //request.setUrl(QUrl("http://mobile.viaggiatreno.it/viaggiatreno/mobile/stazione?lang=IT"));
-    request.setUrl(QUrl("http://mobile.viaggiatreno.it/vt_pax_internet/mobile/stazione?lang=IT"));
-    request.setRawHeader("Content-type", "application/x-www-form-urlencoded");
-    request.setOriginatingObject(item);
-    QNetworkReply *reply = m_nam->post(request, dati.toUtf8());
-    connect(reply, SIGNAL(finished()), this, SLOT(downloadEffettuato()));
-
+    inviaPost(item, QStringLiteral("/stazione?lang=IT"), {{QStringLiteral("codiceStazione"), item->dato("CodiceStazione")}});
 }
 
 //invia richiesta HTTP a ViaggiaTreno per ottenere la scheda di un treno dato il suo numero
 void DownloadViaggiaTreno::richiestaHTTPRiepilogoTreno(DownloadViaggiaTrenoItem *item)
 {
-    QNetworkRequest request;
-    QString str;
-
-    str = QString("numeroTreno=%1&tipoRicerca=numero&lang=IT").arg(item->dato("Numero"));
- //   request.setUrl(QUrl("http://mobile.viaggiatreno.it/viaggiatreno/mobile/numero"));
-     request.setUrl(QUrl("http://mobile.viaggiatreno.it/vt_pax_internet/mobile/numero"));
-    request.setRawHeader("Content-type", "application/x-www-form-urlencoded");
-    request.setOriginatingObject(item);
-    QNetworkReply *reply = m_nam->post(request, str.toUtf8());
-    connect(reply, SIGNAL(finished()), this, SLOT(downloadEffettuato()));
+    inviaPost(item, QStringLiteral("/numero"), {
+        {QStringLiteral("numeroTreno"), item->dato("Numero")},
+        {QStringLiteral("tipoRicerca"), QStringLiteral("numero")},
+        {QStringLiteral("lang"), QStringLiteral("IT")}});
 }
 
 //invia richiesta HTTP a ViaggiaTreno per ottenere la scheda di un treno dato il suo numero
 //ed il codice della stazione di origine
 void DownloadViaggiaTreno::richiestaHTTPRiepilogoTrenoConOrigine(DownloadViaggiaTrenoItem *item)
 {
-    QNetworkRequest request;
-    QString str;
-
-    str = QString("cbxTreno=%1;").arg(item->dato("Numero"));
-    str += QString("%1&tipoRicerca=numero&lang=IT").arg(item->dato("CodiceStazione"));
-    //request.setUrl(QUrl("http://mobile.viaggiatreno.it/viaggiatreno/mobile/numero"));
-    request.setUrl(QUrl("http://mobile.viaggiatreno.it/vt_pax_internet/mobile/numero"));
-    request.setRawHeader("Content-type", "application/x-www-form-urlencoded");
-    request.setOriginatingObject(item);
-    QNetworkReply *reply = m_nam->post(request, str.toUtf8());
-    connect(reply, SIGNAL(finished()), this, SLOT(downloadEffettuato()));
-
+    inviaPost(item, QStringLiteral("/numero"), {
+        {QStringLiteral("cbxTreno"), item->dato("Numero") + QLatin1Char(';') + item->dato("CodiceStazione")},
+        {QStringLiteral("tipoRicerca"), QStringLiteral("numero")},
+        {QStringLiteral("lang"), QStringLiteral("IT")}});
 }
 
 //invia richiesta HTTP a ViaggiaTreno per ottenere la scheda con i dettagli di un treno dato il suo numero
 void DownloadViaggiaTreno::richiestaHTTPDettagliTreno(DownloadViaggiaTrenoItem *item)
 {
-    QNetworkRequest request;
-
-   // request.setUrl(QUrl(QString("http://mobile.viaggiatreno.it/viaggiatreno/mobile/scheda?dettaglio=visualizza&numeroTreno=%1&tipoRicerca=numero&lang=IT").arg(item->dato("Numero"))));
-       request.setUrl(QUrl(QString("http://mobile.viaggiatreno.it/vt_pax_internet/mobile/scheda?dettaglio=visualizza&numeroTreno=%1&tipoRicerca=numero&lang=IT").arg(item->dato("Numero"))));
-    request.setOriginatingObject(item);
-    QNetworkReply *reply = m_nam->get(request);
-    connect(reply, SIGNAL(finished()), this, SLOT(downloadEffettuato()));
-
+    inviaGet(item, QString(s_urlBaseVT + "/scheda?dettaglio=visualizza&numeroTreno=%1&tipoRicerca=numero&lang=IT")
+             .arg(item->dato("Numero")));
 }
 
 //invia richiesta HTTP a ViaggiaTreno per ottenere la scheda con i dettagli di un treno
 //dati il suo numero ed il codice della stazione di origine
 void DownloadViaggiaTreno::richiestaHTTPDettagliTrenoConOrigine(DownloadViaggiaTrenoItem *item)
 {
-    QNetworkRequest request;
-
-//    request.setUrl(QUrl(QString("http://mobile.viaggiatreno.it/viaggiatreno/mobile/scheda?dettaglio=visualizza&numeroTreno=%1&&codLocOrig=%2&tipoRicerca=numero&lang=IT").
-    request.setUrl(QUrl(QString("http://mobile.viaggiatreno.it/vt_pax_internet/mobile/scheda?dettaglio=visualizza&numeroTreno=%1&&codLocOrig=%2&tipoRicerca=numero&lang=IT").
-                        arg(item->dato("Numero")).arg(item->dato("CodiceStazione"))));
-    request.setOriginatingObject(item);
-    QNetworkReply *reply = m_nam->get(request);
-    connect(reply, SIGNAL(finished()), this, SLOT(downloadEffettuato()));
+    inviaGet(item, QString(s_urlBaseVT + "/scheda?dettaglio=visualizza&numeroTreno=%1&&codLocOrig=%2&tipoRicerca=numero&lang=IT")
+             .arg(item->dato("Numero"), item->dato("CodiceStazione")));
 }
 
 
@@ -243,79 +255,79 @@ void DownloadViaggiaTreno::richiestaHTTPDettagliTrenoConOrigine(DownloadViaggiaT
 void DownloadViaggiaTreno::downloadEffettuato()
 {
     QNetworkReply *reply = qobject_cast<QNetworkReply*>(sender());
+    if (!reply)
+        return;
+    reply->deleteLater();
 
-    QString risposta = QString::fromUtf8(reply->readAll());
-    //il file XHTML generato da viaggiatreno non è sintatticamente corretto, vanno corretti alcuni errori
-    risposta = correggiOutputVT(risposta);
-
-   // debugStringa(risposta);
-
-    //ricava l'item corrispondente a questo downloadQNetworkReply
-
+    //ricava l'item corrispondente a questo download
     DownloadViaggiaTrenoItem * item = qobject_cast<DownloadViaggiaTrenoItem*>(reply->request().originatingObject());
+    if (!item)
+        return;
 
     //recupera puntatore alla scheda
     SchedaQViaggiaTreno* scheda = m_qvt->scheda(item->idScheda());
 
-    //se la scheda è ancora aperta richiama la funzione downloadFinito della scheda, altrimenti non fare nulla
+    //se la scheda è ancora aperta notifica l'esito, altrimenti non fare nulla
     if (scheda)
-        scheda->downloadFinito(risposta);
+    {
+        if (reply->error() != QNetworkReply::NoError)
+            scheda->downloadFallito(reply->errorString());
+        else
+        {
+            //il file XHTML generato da viaggiatreno non è sintatticamente corretto, vanno corretti alcuni errori
+            const QString risposta = correggiOutputVT(QString::fromUtf8(reply->readAll()));
+            scheda->downloadFinito(risposta);
+        }
+    }
 
     //in questa sezione andrà aggiunta il testo della scheda alla cache se necessario
 
     //l'item non serve più, liberare memoria
     delete item;
-
-    //la risposta non serve più, liberare memoria
-    reply->deleteLater();
 }
 
 
 //slot
-//effettua un controllo periodico sul corretto funzionamento del servizio web di viaggiatreno
-bool DownloadViaggiaTreno::controllaViaggiaTreno()
+//effettua un controllo periodico (asincrono) sul corretto funzionamento del servizio web di viaggiatreno
+void DownloadViaggiaTreno::controllaViaggiaTreno()
 {
+    //se c'è già un controllo in corso non ne avvia un altro
+    if (m_controlloInCorso)
+        return;
+
     //prova a scaricare la pagina di query di un treno di ViaggiaTreno
     QNetworkRequest request;
-    //request.setUrl(QUrl("http://mobile.viaggiatreno.it/viaggiatreno/mobile/"));
-    request.setUrl(QUrl("http://mobile.viaggiatreno.it/vt_pax_internet/mobile"));
+    request.setUrl(QUrl(s_urlBaseVT));
+    request.setHeader(QNetworkRequest::UserAgentHeader,
+                      QStringLiteral("QViaggiaTreno/") + QCoreApplication::applicationVersion());
+    request.setTransferTimeout(m_qvt->configurazione().intervalloControlloVT()*1000);
 
-    QNetworkReply *reply = m_nam->get(request);
-    // usa un event loop per effettuare una richiesta sincrona
-    QEventLoop loop;
-    connect(reply, SIGNAL(finished()), &loop, SLOT(quit()));
-    //ed usa un timer singleshot per il timeout
-    QTimer::singleShot(m_qvt->configurazione().intervalloControlloVT()*1000, &loop, SLOT(quit()));
-    //esegui l'event loop
-    loop.exec();
+    m_controlloInCorso = m_nam->get(request);
+    connect(m_controlloInCorso, &QNetworkReply::finished, this, &DownloadViaggiaTreno::controlloTerminato);
+}
 
-    //si è usciti dal loop o perché c'è stato un timeout o perché il download si è concluso positivamente
-    //verifica se non si è concluso positivamente
-    if (reply->error()!= QNetworkReply::NoError)
+//conclusione del controllo: il servizio funziona se non ci sono errori e la pagina contiene "Numero treno"
+void DownloadViaggiaTreno::controlloTerminato()
+{
+    QNetworkReply *reply = qobject_cast<QNetworkReply*>(sender());
+    if (!reply)
+        return;
+    reply->deleteLater();
+    m_controlloInCorso = nullptr;
+
+    bool funziona = false;
+    if (reply->error() == QNetworkReply::NoError)
+        funziona = QString::fromUtf8(reply->readAll()).contains("Numero treno");
+
+    emit statoViaggiaTreno(funziona);
+    if (funziona)
     {
-        emit statoViaggiaTreno(false);
-        //ferma i donwload da ViaggiaTreno
-        m_timerDownload->stop();
-        return false;
+        if (!m_timerDownload->isActive())
+            m_timerDownload->start();
     }
     else
-    {
-        //il download sembra essersi concluso positivamente, estraiamo il codice HTML
-        QString paginaVT = QString::fromUtf8(reply->readAll());
-        //e cerchiamo se la pagina contiene il testo "Numero treno"
-        if (paginaVT.contains("Numero treno"))
-        {
-            emit statoViaggiaTreno(true);
-            return true;
-        }
-        else
-        {
-            emit statoViaggiaTreno(false);
-            //ferma i donwload da ViaggiaTreno
-            m_timerDownload->stop();
-            return false;
-        }
-    }
+        //ferma i donwload da ViaggiaTreno
+        m_timerDownload->stop();
 }
 
 //avvia il downloader
@@ -327,11 +339,7 @@ void DownloadViaggiaTreno::avvia()
     //avvia il timer per il controllo periodico del funzionamento di ViaggiaTreno
     m_timerControlloVT->start();
 
-    //esegue un controllo preliminare sul funzionamento di Viaggiatreno
-    if (!controllaViaggiaTreno())
-    // viaggiatreno non funziona
-        return;
-    else
-        m_timerDownload->start();
-
+    //esegue un controllo preliminare sul funzionamento di Viaggiatreno;
+    //il timer di download parte solo se il controllo ha esito positivo
+    controllaViaggiaTreno();
 }

@@ -20,7 +20,13 @@
 #ifndef PARSER_TRENORD_H
 #define PARSER_TRENORD_H
 
-#include <QtWebKit>
+#include <QAbstractTableModel>
+#include <QDateTime>
+#include <QList>
+#include <QObject>
+#include <QQueue>
+#include <QString>
+#include <QWidget>
 
 class SchedaQViaggiaTreno;
 
@@ -48,14 +54,14 @@ class ParserTrenord : public QObject
 {
     Q_OBJECT
 public:
-    ParserTrenord(SchedaQViaggiaTreno* scheda);
+    explicit ParserTrenord(SchedaQViaggiaTreno* scheda);
     bool analizzaListaDirettrici(const QString& rispostaTN);
     QQueue<QString> listaDirettrici() const {return m_direttrici;}
 
 
 private:
     QQueue<QString> m_direttrici;
-    SchedaQViaggiaTreno* m_scheda;
+    SchedaQViaggiaTreno* m_scheda = nullptr;
 
 };
 
@@ -64,12 +70,12 @@ class ModelloAvvisiTrenord : public QAbstractTableModel
     Q_OBJECT
 
 public:
-    ModelloAvvisiTrenord(QWidget* parent);
+    explicit ModelloAvvisiTrenord(QWidget* parent);
 
-    virtual QVariant headerData(int section, Qt::Orientation orientation, int role = Qt::DisplayRole) const;
-    virtual QVariant data(const QModelIndex &index, int role) const;
-    virtual int rowCount(const QModelIndex &parent) const;
-    virtual int columnCount(const QModelIndex &parent) const;
+    QVariant headerData(int section, Qt::Orientation orientation, int role = Qt::DisplayRole) const override;
+    QVariant data(const QModelIndex &index, int role) const override;
+    int rowCount(const QModelIndex &parent) const override;
+    int columnCount(const QModelIndex &parent) const override;
 
  private:
     QList<AvvisoTrenord> m_avvisi;

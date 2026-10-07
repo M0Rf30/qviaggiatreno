@@ -36,19 +36,14 @@ SchedaAvvisiTrenord::SchedaAvvisiTrenord(QViaggiaTreno *parent, const unsigned i
     addWidget(m_widgetAvvisi);
 
     //connessioni
-    connect(this, SIGNAL(statoCambiato(quint32)), parent, SLOT(aggiornaStatoScheda(quint32)));
+    connect(this, &SchedaAvvisiTrenord::statoCambiato, parent, &QViaggiaTreno::aggiornaStatoScheda);
     //TODO: una volta terminato codice scheda verificare se questa connessione sia realmente necessaria
-    connect(this, SIGNAL(messaggioStatus(const QString&)), parent, SLOT(mostraMessaggioStatusBar(const QString&)));
-    connect(this, SIGNAL(aggiornaListaDirettrici()), qViaggiaTreno()->downloadTrenord(), SLOT(aggiornaListaDirettrici()));
+    connect(this, &SchedaAvvisiTrenord::messaggioStatus, parent, &QViaggiaTreno::mostraMessaggioStatusBar);
+    connect(this, &SchedaAvvisiTrenord::aggiornaListaDirettrici, qViaggiaTreno()->downloadTrenord(), &DownloadTrenord::aggiornaListaDirettrici);
 }
 
-SchedaAvvisiTrenord::~SchedaAvvisiTrenord()
-{
-    if (m_parser)
-        delete m_parser;
-    if (m_avvisi)
-        delete m_avvisi;
-}
+//parser e modello hanno questa scheda come parent: vengono distrutti da Qt
+SchedaAvvisiTrenord::~SchedaAvvisiTrenord() = default;
 
 void SchedaAvvisiTrenord::avvia()
 {

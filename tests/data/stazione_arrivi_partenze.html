@@ -1,0 +1,31 @@
+<html>
+<head>
+<title>Stazione</title>
+<!--
+Struttura attesa da ParserStazioneViaggiaTreno::analizza (pagina gia' corretta da correggiOutputVT):
+html/body
+  h1: "Stazione di NOME" (il nome e' tutto dopo le prime due parole)
+  commento contenente "partenze"
+  un elemento per treno (div):
+    h2: "CATEGORIA NUMERO"
+    div: strong (stazione di destinazione/origine), strong (orario) e testo
+         "Previsto: BIN Binario Reale: BIN in orario" oppure "... in ritardo di N minuti"
+         (nelle partenze i minuti di ritardo sono il penultimo elemento, negli arrivi l'ultimo)
+    a: href con parametro "codLocOrig" come secondo parametro; i treni senza codice sono scartati
+  commento contenente "arrivi" (chiude le partenze e apre gli arrivi)
+  un elemento per treno (come sopra)
+  commento di chiusura
+-->
+</head>
+<body>
+<h1>Stazione di MILANO CENTRALE</h1>
+<!-- partenze -->
+<div><h2>REG 2345</h2><div><strong>BRESCIA</strong> alle <strong>10:15</strong> Previsto: 5 Binario Reale: 5 in orario</div><a href="dettaglio?numero=2345&codLocOrig=S01700">dettagli</a></div>
+<div><h2>IC 601</h2><div><strong>VENEZIA S.LUCIA</strong> alle <strong>11:00</strong> Previsto: 7 Binario Reale: 8 in ritardo di 12 minuti</div><a href="dettaglio?numero=601&codLocOrig=S01700">dettagli</a></div>
+<div><h2>S 5</h2><div><strong>SARONNO</strong> alle <strong>11:30</strong> Previsto: -- Binario Reale: -- in orario</div><a href="dettaglio?numero=5&">dettagli</a></div>
+<!-- arrivi -->
+<div><h2>R 2400</h2><div><strong>VARESE</strong> alle <strong>10:45</strong> Previsto: 3 A Binario Reale: 3 A in ritardo di 7</div><a href="dettaglio?numero=2400&codLocOrig=S01322">dettagli</a></div>
+<div><h2>ES 9701</h2><div><strong>ROMA TERMINI</strong> alle <strong>12:05</strong> Previsto: -- Binario Reale: -- in orario</div><a href="dettaglio?numero=9701&codLocOrig=S08409">dettagli</a></div>
+<!-- fine -->
+</body>
+</html>

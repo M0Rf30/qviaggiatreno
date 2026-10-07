@@ -19,7 +19,6 @@
  ***************************************************************************/
 
 
-#include <QtGui>
 
 #include "schedalistatreni.h"
 #include "schedastazione.h"

@@ -1,4 +1,0 @@
-?package(qviaggiatreno):needs="x11" \
-	section="Applications/Network/Monitoring" \
-	title="QViaggiaTreno" \
-	command="/usr/bin/qviaggiatreno"

@@ -22,6 +22,9 @@
 #ifndef SCHEDASTAZIONE_H
 #define SCHEDASTAZIONE_H
 
+#include <QDomDocument>
+#include <QListWidget>
+#include <QSortFilterProxyModel>
 #include "schedaviaggiatreno.h"
 #include "parser_viaggiatreno_stazione.h"
 
@@ -48,7 +51,7 @@ public:
     void aggiornaComboFiltroPartenze(tipoFiltro filtro, QString filtroCategoria, QString filtroStazione, QStringList categorie, QStringList stazioni);
     void impostaComboFiltri(tipoFiltro arrivi, tipoFiltro partenze);
 
-public slots:
+public Q_SLOTS:
     void mouseEntered(const QModelIndex& index);
 };
 
@@ -61,16 +64,24 @@ public:
 
     QString nomeStazione() const;
     QString codiceStazione() const { return m_codice; }
-    virtual QString titolo( bool titoloBreve = false) const;
-    virtual void salvaScheda(QSettings& settings);
+    QString titolo( bool titoloBreve = false) const override;
+    void salvaScheda(QSettings& settings) override;
     virtual void ripristinaFiltri(QSettings& settings);
 
-public slots:
-    virtual void aggiorna();
+public Q_SLOTS:
+    void aggiorna() override;
     void cambiaCodiceStazione(const QString& nuovoCodice);
     void modificaNomeStazione();
 
-    virtual void downloadFinito(const QString& rispostaVT);
+    void downloadFinito(const QString& rispostaVT) override;
+    void downloadFallito(const QString& errore) override;
+
+    //slot collegati ai widget della scheda (pubblici perché connessi da WidgetStazione)
+    void itemAttivato(const QModelIndex& index);
+    void tipoFiltroArriviSelezionato(int);
+    void tipoFiltroPartenzeSelezionato(int);
+    void filtroArriviSelezionato(const QString&);
+    void filtroPartenzeSelezionato(const QString&);
 
 
 private:
@@ -96,14 +107,8 @@ private:
     void riapplicaFiltroPartenze();
     void eliminaFiltriNonApplicabili();
 
-private slots:
-    void itemAttivato(const QModelIndex& index);
-    void tipoFiltroArriviSelezionato(int);
-    void tipoFiltroPartenzeSelezionato(int);
-    void filtroArriviSelezionato(QString);
-    void filtroPartenzeSelezionato(QString);
 
-signals:
+Q_SIGNALS:
     void downloadStazione(quint32, const QString&);
     void downloadStazioneConCodice(quint32, const QString&);
 
@@ -122,10 +127,10 @@ public:
 private:
     QListWidget* listaNomi;
 
-private slots:
+private Q_SLOTS:
     void sceltaNomeStazione();
 
-signals:
+Q_SIGNALS:
     void nomeDisambiguato(const QString& nuovoCodice);
 };
 

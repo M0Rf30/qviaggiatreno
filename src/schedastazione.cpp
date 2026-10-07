@@ -23,14 +23,17 @@
 #include "download_viaggiatreno.h"
 #include "utils.h"
 
+#include <QInputDialog>
+#include <QLineEdit>
+
 
 SchedaStazione::SchedaStazione(QViaggiaTreno* parent, const QString& nome, bool nomeEsatto, const unsigned int intervalloStandard)
     : SchedaQViaggiaTreno(parent, tsStazione, intervalloStandard)
 {
     m_stazione = nome;
-    m_codice = "";
+    m_codice = QString();
     m_stato = statoNuovaScheda;
-    m_documentoDom = 0L;
+    m_documentoDom = nullptr;
     m_idTabella = m_idNomeSbagliato = m_idNomeAmbiguo = -1;
     m_nomeEsatto = nomeEsatto;
 
@@ -40,8 +43,8 @@ SchedaStazione::SchedaStazione(QViaggiaTreno* parent, const QString& nome, bool 
     //imposta i modelli
     m_arrivi = new ModelloStazione(this, false);
     m_partenze = new ModelloStazione(this, true);
-    m_filtroArrivi = new QSortFilterProxyModel();
-    m_filtroPartenze = new QSortFilterProxyModel();
+    m_filtroArrivi = new QSortFilterProxyModel(this);
+    m_filtroPartenze = new QSortFilterProxyModel(this);
     m_filtroArrivi->setDynamicSortFilter(true);
     m_filtroPartenze->setDynamicSortFilter(true);
     m_filtroArrivi->setSourceModel(m_arrivi);
@@ -56,13 +59,18 @@ SchedaStazione::SchedaStazione(QViaggiaTreno* parent, const QString& nome, bool 
     m_testoFiltroCategorieArrivi = m_testoFiltroCategoriePartenze =
             m_testoFiltroStazioniArrivi = m_testoFiltroStazioniPartenze = "Tutte";
     //connessioni
-    connect(this, SIGNAL(statoCambiato(quint32)), parent, SLOT(aggiornaStatoScheda(quint32)));
-    connect(this, SIGNAL(nomeSchedaCambiato(quint32)), parent, SLOT(aggiornaNomeScheda(quint32)));
-    connect(this, SIGNAL(apriSchedaStazione(const QString&, bool)), parent, SLOT(nuovaStazione(const QString&, bool)));
-    connect(this, SIGNAL(apriSchedaTreno(const QString&, const QString&)), parent, SLOT(nuovoTreno(const QString&, const QString&)));
-    connect(this, SIGNAL(messaggioStatus(const QString&)), parent, SLOT(mostraMessaggioStatusBar(const QString&)));
-    connect(this, SIGNAL(downloadStazione(quint32,QString)), qViaggiaTreno()->downloadViaggiaTreno(), SLOT(downloadStazione(quint32,QString)));
-    connect(this, SIGNAL(downloadStazioneConCodice(quint32,QString)), qViaggiaTreno()->downloadViaggiaTreno(), SLOT(downloadStazioneCodice(quint32,QString)));
+    connect(this, &SchedaStazione::statoCambiato, parent, &QViaggiaTreno::aggiornaStatoScheda);
+    connect(this, &SchedaStazione::nomeSchedaCambiato, parent, &QViaggiaTreno::aggiornaNomeScheda);
+    connect(this, &SchedaStazione::apriSchedaStazione, parent, [parent](const QString& stazione, bool nomeEsatto) {
+        parent->nuovaStazione(stazione, nomeEsatto);
+    });
+    connect(this, qOverload<const QString&, const QString&>(&SchedaStazione::apriSchedaTreno), parent,
+            [parent](const QString& treno, const QString& codice) {
+        parent->nuovoTreno(treno, codice);
+    });
+    connect(this, &SchedaStazione::messaggioStatus, parent, &QViaggiaTreno::mostraMessaggioStatusBar);
+    connect(this, &SchedaStazione::downloadStazione, qViaggiaTreno()->downloadViaggiaTreno(), &DownloadViaggiaTreno::downloadStazione);
+    connect(this, &SchedaStazione::downloadStazioneConCodice, qViaggiaTreno()->downloadViaggiaTreno(), &DownloadViaggiaTreno::downloadStazioneCodice);
 
 }
 
@@ -203,6 +211,13 @@ void SchedaStazione::downloadFinito(const QString& rispostaVT)
     emit messaggioStatus(QString::fromUtf8("Aggiornati dati stazione di %1").arg(titolo(true)));
 }
 
+//il download è fallito: oltre allo stato di errore della base, segnala il problema nella scheda
+void SchedaStazione::downloadFallito(const QString& errore)
+{
+    SchedaQViaggiaTreno::downloadFallito(errore);
+    m_widgetStazione->impostaAggiornamento(QString::fromUtf8("Aggiornamento scheda non riuscito: %1").arg(errore), true);
+}
+
 void SchedaStazione::modificaNomeStazione()
 {
     bool ok;
@@ -212,7 +227,7 @@ void SchedaStazione::modificaNomeStazione()
     if (ok & !nuovoNome.isEmpty())
     {
         m_stazione = nuovoNome;
-        m_codice = "";
+        m_codice = QString();
         m_widgetStazione->impostaTitolo(titolo());
 
         //assicurarsi che venga visualizzato il widget della stazione e non il widget di errore
@@ -365,7 +380,7 @@ void SchedaStazione::tipoFiltroPartenzeSelezionato(int tipo)
     riapplicaFiltroPartenze();
 }
 
-void SchedaStazione::filtroArriviSelezionato(QString filtro)
+void SchedaStazione::filtroArriviSelezionato(const QString& filtro)
 {
     if (m_widgetStazione->tipoFiltroArriviAttivo() == FiltraCategoria)
         m_testoFiltroCategorieArrivi = filtro;
@@ -375,7 +390,7 @@ void SchedaStazione::filtroArriviSelezionato(QString filtro)
     riapplicaFiltroArrivi();
 }
 
-void SchedaStazione::filtroPartenzeSelezionato(QString filtro)
+void SchedaStazione::filtroPartenzeSelezionato(const QString& filtro)
 {
     if (m_widgetStazione->tipoFiltroPartenzeAttivo() == FiltraCategoria)
         m_testoFiltroCategoriePartenze = filtro;

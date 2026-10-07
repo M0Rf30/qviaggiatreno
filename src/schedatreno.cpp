@@ -18,7 +18,7 @@
  *   59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.             *
  ***************************************************************************/
 
-#include <QtNetwork>
+#include <QLocale>
 #include "schedatreno.h"
 #include "qviaggiatreno.h"
 #include "download_viaggiatreno.h"
@@ -29,7 +29,7 @@ SchedaTreno::SchedaTreno(QViaggiaTreno *parent, const QString &numero, const uns
         SchedaQViaggiaTreno(parent, tsTreno, intervalloStandard)
 {
     m_numero = numero;
-    m_codiceStazioneOrigine = "";
+    m_codiceStazioneOrigine = QString();
     m_idTabelle = m_idNumeroSbagliato = m_idNumeroAmbiguo = -1;
     m_riepilogoScaricato = false;
 
@@ -46,14 +46,20 @@ SchedaTreno::SchedaTreno(QViaggiaTreno *parent, const QString &numero, const uns
     m_widget->impostaNumeroTreno(numero);
 
     //connessioni
-    connect(this, SIGNAL(statoCambiato(quint32)), parent, SLOT(aggiornaStatoScheda(quint32)));
-    connect(this, SIGNAL(nomeSchedaCambiato(quint32)), parent, SLOT(aggiornaNomeScheda(quint32)));
-    connect(this, SIGNAL(apriSchedaStazione(const QString&, bool)), parent, SLOT(nuovaStazione(const QString&, bool)));
-    connect(this, SIGNAL(messaggioStatus(const QString&)), parent, SLOT(mostraMessaggioStatusBar(const QString&)));
-    connect(this, SIGNAL(downloadRiepilogoTreno(quint32, QString)), qViaggiaTreno()->downloadViaggiaTreno(), SLOT(downloadRiepilogoTreno(quint32, QString)));
-    connect(this, SIGNAL(downloadRiepilogoTreno(quint32,QString,QString)), qViaggiaTreno()->downloadViaggiaTreno(), SLOT(downloadRiepilogoTreno(quint32, QString, QString)));
-    connect(this, SIGNAL(downloadDettagliTreno(quint32,QString)), qViaggiaTreno()->downloadViaggiaTreno(), SLOT(downloadDettagliTreno(quint32, QString)));
-    connect(this, SIGNAL(downloadDettagliTreno(quint32,QString,QString)), qViaggiaTreno()->downloadViaggiaTreno(), SLOT(downloadDettagliTreno(quint32, QString, QString)));
+    connect(this, &SchedaTreno::statoCambiato, parent, &QViaggiaTreno::aggiornaStatoScheda);
+    connect(this, &SchedaTreno::nomeSchedaCambiato, parent, &QViaggiaTreno::aggiornaNomeScheda);
+    connect(this, &SchedaTreno::apriSchedaStazione, parent, [parent](const QString& stazione, bool nomeEsatto) {
+        parent->nuovaStazione(stazione, nomeEsatto);
+    });
+    connect(this, &SchedaTreno::messaggioStatus, parent, &QViaggiaTreno::mostraMessaggioStatusBar);
+    connect(this, qOverload<quint32, const QString&>(&SchedaTreno::downloadRiepilogoTreno),
+            qViaggiaTreno()->downloadViaggiaTreno(), qOverload<quint32, const QString&>(&DownloadViaggiaTreno::downloadRiepilogoTreno));
+    connect(this, qOverload<quint32, const QString&, const QString&>(&SchedaTreno::downloadRiepilogoTreno),
+            qViaggiaTreno()->downloadViaggiaTreno(), qOverload<quint32, const QString&, const QString&>(&DownloadViaggiaTreno::downloadRiepilogoTreno));
+    connect(this, qOverload<quint32, const QString&>(&SchedaTreno::downloadDettagliTreno),
+            qViaggiaTreno()->downloadViaggiaTreno(), qOverload<quint32, const QString&>(&DownloadViaggiaTreno::downloadDettagliTreno));
+    connect(this, qOverload<quint32, const QString&, const QString&>(&SchedaTreno::downloadDettagliTreno),
+            qViaggiaTreno()->downloadViaggiaTreno(), qOverload<quint32, const QString&, const QString&>(&DownloadViaggiaTreno::downloadDettagliTreno));
 }
 
 
@@ -113,7 +119,7 @@ void SchedaTreno::downloadFinito(const QString &rispostaVT)
         {
             m_widget->impostaStato(TrenoVT::TrenoNonPrevisto);
             m_ultimoAgg = QDateTime::currentDateTime();
-            m_widget->impostaAggiornamento(m_ultimoAgg.toString(Qt::DefaultLocaleShortDate));
+            m_widget->impostaAggiornamento(QLocale().toString(m_ultimoAgg, QLocale::ShortFormat));
             return;
         }
 
@@ -123,7 +129,7 @@ void SchedaTreno::downloadFinito(const QString &rispostaVT)
         {
             m_widget->impostaStato(TrenoVT::TrenoCancellato);
             m_ultimoAgg = QDateTime::currentDateTime();
-            m_widget->impostaAggiornamento(m_ultimoAgg.toString(Qt::DefaultLocaleShortDate));
+            m_widget->impostaAggiornamento(QLocale().toString(m_ultimoAgg, QLocale::ShortFormat));
             cambiaStato(statoMonitoraggioAttivo);
             return;
         }
@@ -178,6 +184,15 @@ void SchedaTreno::downloadFinito(const QString &rispostaVT)
     cambiaStato(statoMonitoraggioAttivo);
     emit messaggioStatus(QString::fromUtf8("Aggiornati dati treno %1").arg(titolo(true)));
     m_widget->impostaAggiornamento(m_ultimoAgg.toString("dd/MM/yyyy hh:mm"));
+}
+
+//il download è fallito: la scheda non deve restare bloccata a metà del ciclo riepilogo/dettagli
+void SchedaTreno::downloadFallito(const QString& errore)
+{
+    //al prossimo aggiornamento si deve ripartire dal riepilogo
+    m_riepilogoScaricato = false;
+    SchedaQViaggiaTreno::downloadFallito(errore);
+    m_widget->impostaAggiornamento(QString::fromUtf8("Aggiornamento scheda non riuscito: %1").arg(errore), true);
 }
 
 

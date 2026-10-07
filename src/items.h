@@ -20,15 +20,16 @@
 
 #ifndef ITEMS_H
 #define ITEMS_H
-#include <QtWidgets>
+#include <QListWidgetItem>
+#include <QString>
 
 class SortedAsIntListWidgetItem : public QListWidgetItem
 {
     public:
-    SortedAsIntListWidgetItem(const QString& string) : QListWidgetItem(string)
+    explicit SortedAsIntListWidgetItem(const QString& string) : QListWidgetItem(string)
     {}
 
-    virtual bool operator < (const QListWidgetItem& other) const;
+    bool operator < (const QListWidgetItem& other) const override;
 };
 
 #endif // ITEMS_H

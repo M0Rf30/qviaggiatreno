@@ -18,8 +18,18 @@
  *   59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.             *
  ***************************************************************************/
 
-
-#include <QtWidgets>
+#include <QDebug>
+#include <QDialog>
+#include <QFile>
+#include <QInputDialog>
+#include <QMenu>
+#include <QMessageBox>
+#include <QPushButton>
+#include <QStatusBar>
+#include <QTabWidget>
+#include <QTextEdit>
+#include <QToolBar>
+#include <QVBoxLayout>
 
 #include "dialogo_nomestazione.h"
 #include "dialogo_configurazione.h"
@@ -35,7 +45,7 @@
 void QViaggiaTreno::about()
 {
     QMessageBox::about(this, QString::fromUtf8("Informazioni su QViaggiaTreno"),
-      QString::fromUtf8("QViaggiaTreno versione %1\n\n(C) 2008-2012 fra74\n\n%2").arg(s_versione)
+      QString::fromUtf8("QViaggiaTreno versione %1\n\n(C) 2008-2012 fra74\n\n%2").arg(QCoreApplication::applicationVersion())
       .arg(QString::fromUtf8("QViaggiaTreno è un'interfaccia a ViaggiaTreno, il servizio web di Trenitalia per monitorare la marcia dei treni passeggeri\n\n"
                              "Questo programma è distribuito secondo i termini della licenza GNU GPL v.2"
                              "\n\nQViaggiaTreno utilizza il widget 'QLedIndicator' scritto da 'Tn'")));
@@ -54,19 +64,20 @@ void QViaggiaTreno::visualizzaLicenza()
             //senza eccessivo a capo
             textEdit->setMinimumWidth(500);
             vbox->addWidget(textEdit);
-            QPushButton *button = new QPushButton(QString::fromUtf8("Ok"), this);
+            QPushButton *button = new QPushButton(QString::fromUtf8("Ok"), m_licenseDialog);
             vbox->addWidget(button, 0, Qt::AlignCenter);
             m_licenseDialog->setLayout(vbox);
-            connect(button, SIGNAL(clicked()), m_licenseDialog, SLOT(accept()));
+            connect(button, &QPushButton::clicked, m_licenseDialog, &QDialog::accept);
 
             //lettura del file di testo contenente il testo della licenza GPL
             textEdit->setReadOnly(true);
             textEdit->setCursorWidth(0); //cursore non visibile
             QString linea;
             QFile testoLicenza(":/doc/GPL-2.txt");
-            testoLicenza.open(QFile::ReadOnly);
-            QString txt = testoLicenza.readAll();
-            textEdit->insertPlainText(txt);
+            if (testoLicenza.open(QFile::ReadOnly))
+                textEdit->insertPlainText(QString::fromUtf8(testoLicenza.readAll()));
+            else
+                textEdit->insertPlainText(QString::fromUtf8("Impossibile leggere il testo della licenza"));
             //riporta il cursore all'inizio del documento
             textEdit->moveCursor(QTextCursor::Start);
         }
@@ -119,11 +130,11 @@ void QViaggiaTreno::nuovaStazione()
     QStringList listaOrdinata = m_listaStazioniMonitorate;
     listaOrdinata.sort();
 
-    DialogoNomeStazione *dialogo = new DialogoNomeStazione(this, listaOrdinata);
+    DialogoNomeStazione dialogo(this, listaOrdinata);
    //	QString stazione = QInputDialog::getItem(this, QString::fromUtf8("Monitoraggio stazione"), QString::fromUtf8("Inserire il nome della stazione da monitorare con ViaggiaTreno:"), listaOrdinata, -1, true, &ok);
-    if (dialogo->exec())
+    if (dialogo.exec())
         {
-        QString stazione = dialogo->nomeStazione();
+        QString stazione = dialogo.nomeStazione();
 
             //verifica che non ci sia già una scheda aperta per questa stazione
             //se esiste allora la relativa scheda diventerà la scheda corrente
@@ -146,10 +157,8 @@ void QViaggiaTreno::nuovaStazione()
                 }
 
             //non ci sono schede già aperte, aprine una nuova
-            nuovaStazione(stazione, !(dialogo->cercaTutteStazioni()));
+            nuovaStazione(stazione, !(dialogo.cercaTutteStazioni()));
         }
-
-    delete dialogo;
 }
 
 SchedaTreno* QViaggiaTreno::nuovoTreno(const QString& treno, int intervallo)
@@ -174,7 +183,7 @@ SchedaTreno* QViaggiaTreno::nuovoTreno(const QString& treno, int intervallo)
             {
                 //esiste già una scheda con questo nome, selezionala ed esci
                 m_schede->setCurrentWidget(scheda);
-                return 0L;
+                return nullptr;
             }
         }
     }
@@ -194,7 +203,7 @@ SchedaTreno* QViaggiaTreno::nuovoTreno(const QString& treno, int intervallo)
     scheda->avvia();
 
     //aggiunge la scheda al tabwidget assicurandosi che diventi la scheda corrente
-    m_schede->addTab(scheda, QIcon(":/img/treno.png"), scheda->titolo());
+    m_schede->addTab(scheda, QIcon::fromTheme("view-more-horizontal-symbolic"), scheda->titolo());
     m_schede->setCurrentWidget(scheda);
 
     return scheda;
@@ -215,7 +224,7 @@ SchedaTreno* QViaggiaTreno::nuovoTreno(const QString& treno, const QString &codi
             {
                 //esiste già una scheda con questo nome, selezionala ed esci
                 m_schede->setCurrentWidget(scheda);
-                return 0L;
+                return nullptr;
             }
         }
     }
@@ -237,7 +246,7 @@ SchedaTreno* QViaggiaTreno::nuovoTreno(const QString& treno, const QString &codi
     //scheda->avvia();
 
     //aggiunge la scheda al tabwidget assicurandosi che diventi la scheda corrente
-    m_schede->addTab(scheda, QIcon(":/img/treno.png"), scheda->titolo());
+    m_schede->addTab(scheda, QIcon::fromTheme("view-more-horizontal-symbolic"), scheda->titolo());
     m_schede->setCurrentWidget(scheda);
 
     return scheda;
@@ -257,7 +266,7 @@ SchedaStazione* QViaggiaTreno::nuovaStazione(const QString& stazione, bool nomeE
             {
                 //esiste già una scheda con questo nome, selezionala ed esci
                 m_schede->setCurrentWidget(scheda);
-                return 0L;
+                return nullptr;
             }
         }
     }
@@ -298,7 +307,7 @@ SchedaStazione* QViaggiaTreno::nuovaStazione(const QString& stazione, bool nomeE
     }
 
     //aggiunge la scheda al tabwidget assicurandosi che diventi la scheda corrente
-    m_schede->addTab(scheda, QIcon(":/img/stazione.png"), scheda->titolo());
+    m_schede->addTab(scheda, QIcon::fromTheme("go-home"), scheda->titolo());
     m_schede->setCurrentWidget(scheda);
 
     return scheda;
@@ -319,7 +328,7 @@ SchedaListaTreni* QViaggiaTreno::nuovaListaTreni()
     scheda->avvia();
 
     //aggiunge la scheda al tabwidget assicurandosi che diventi la scheda corrente
-    m_schede->addTab(scheda, QIcon(":/img/listatreni.png"), scheda->titolo());
+    m_schede->addTab(scheda, QIcon::fromTheme("view-sort-ascending"), scheda->titolo());
     m_schede->setCurrentWidget(scheda);
 
     //sincronizza la GUI con la scheda
@@ -559,15 +568,13 @@ void QViaggiaTreno::aggiorna()
 //ferma tutte le schede
 void QViaggiaTreno::fermaTutte()
 {
-    SchedaQViaggiaTreno* scheda;
-    foreach(scheda, m_listaSchede)
+    for (SchedaQViaggiaTreno* scheda : std::as_const(m_listaSchede))
         scheda->ferma();
 }
 
 void QViaggiaTreno::avviaTutte()
 {
-    SchedaQViaggiaTreno* scheda;
-    foreach(scheda, m_listaSchede)
+    for (SchedaQViaggiaTreno* scheda : std::as_const(m_listaSchede))
         scheda->avvia();
 }
 

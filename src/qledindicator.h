@@ -22,9 +22,9 @@
 #define QLEDINDICATOR_H
 
 #include <QAbstractButton>
+#include <QPaintEvent>
 #include <QResizeEvent>
 #include <QColor>
-#include <QDebug>
 
 class QLedIndicator : public QAbstractButton
 {
@@ -34,7 +34,7 @@ class QLedIndicator : public QAbstractButton
     Q_PROPERTY(QColor offColor2     WRITE setOffColor2    READ getOffColor2  );
     Q_OBJECT
     public:
-        QLedIndicator(QWidget *parent);
+        explicit QLedIndicator(QWidget *parent);
 
         void setOnColor1(QColor c)  { onColor1  = c;    }
         void setOffColor1(QColor c) { offColor1 = c;    }
@@ -47,17 +47,16 @@ class QLedIndicator : public QAbstractButton
         QColor getOffColor2(void)   { return offColor2; }
 
     protected:
-        virtual void paintEvent (QPaintEvent *event);
-        virtual void resizeEvent(QResizeEvent *event);
+        void paintEvent (QPaintEvent *event) override;
+        void resizeEvent(QResizeEvent *event) override;
         //trucchetto: il pulsante deve essere checkable altrimenti non è possibile cambiare stato
         //ma non voglio che un utente possa cambiare stato con un click
-        virtual void nextCheckState() {setChecked(isChecked());};
+        void nextCheckState() override {setChecked(isChecked());}
 
     private:
-        static const qreal scaledSize;  /* init in cpp */
+        static constexpr qreal scaledSize = 1000;
         QColor  onColor1, offColor1;
         QColor  onColor2, offColor2;
-        QPixmap ledBuffer;
 };
 
 #endif // QLEDINDICATOR_H

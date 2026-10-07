@@ -22,8 +22,6 @@
 
 #include "qledindicator.h"
 
-const qreal QLedIndicator::scaledSize = 1000; /* Visual Studio static const mess */
-
 QLedIndicator::QLedIndicator(QWidget *parent) : QAbstractButton(parent)
 {
     setMinimumSize(24,24);

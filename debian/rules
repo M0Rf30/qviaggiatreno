@@ -1,5 +1,7 @@
 #!/usr/bin/make -f
 
-export QT_SELECT=5
+# Il test suite QtTest richiede una piattaforma grafica fittizia
+export QT_QPA_PLATFORM=offscreen
+
 %:
-	dh $@
+	dh $@ --buildsystem=cmake

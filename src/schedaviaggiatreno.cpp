@@ -22,6 +22,10 @@
 #include "schedaviaggiatreno.h"
 #include "qviaggiatreno.h"
 
+#include <QApplication>
+#include <QFontMetrics>
+#include <QPalette>
+
 unsigned long SchedaQViaggiaTreno::s_id = 0;
 QString SchedaQViaggiaTreno::statoNuovaScheda = QString::fromUtf8("Nuova scheda");
 QString SchedaQViaggiaTreno::statoInAggiornamento = QString::fromUtf8("In aggiornamento");
@@ -37,7 +41,7 @@ SchedaQViaggiaTreno::SchedaQViaggiaTreno(QViaggiaTreno* parent, TipoScheda ts, c
 	m_qviaggiatreno = parent;
 	
 	m_timer = new QTimer(this);
-	connect(m_timer, SIGNAL(timeout()), this, SLOT(aggiorna()));
+	connect(m_timer, &QTimer::timeout, this, &SchedaQViaggiaTreno::aggiorna);
 	m_timer->setInterval(intervalloStandard*60000);
 
     //per default la scheda non è né stampabile né esportabile
@@ -84,7 +88,14 @@ void SchedaQViaggiaTreno::aggiorna()
 	
 }
 
-void SchedaQViaggiaTreno::cambiaStato(QString nuovoStato)
+//slot chiamato quando il download è fallito: la scheda passa in stato di errore e informa l'utente
+void SchedaQViaggiaTreno::downloadFallito(const QString& errore)
+{
+	cambiaStato(statoErrore);
+	emit messaggioStatus(QString::fromUtf8("Aggiornamento non riuscito: %1").arg(errore));
+}
+
+void SchedaQViaggiaTreno::cambiaStato(const QString& nuovoStato)
 {
 	m_stato = nuovoStato;
 	
@@ -99,7 +110,7 @@ int larghezzaItem(const QTableWidgetItem* item)
 		return -1;
 
 	QFontMetrics fm(item->font());
-	int larghezza = fm.width(item->text());
+	int larghezza = fm.horizontalAdvance(item->text());
 	return larghezza;
 }
 

@@ -22,9 +22,14 @@
 #ifndef PARSER_VIAGGIATRENO_STAZIONE_H
 #define PARSER_VIAGGIATRENO_STAZIONE_H
 
-#include <QtXml>
-#include <QColor>
 #include <QAbstractTableModel>
+#include <QColor>
+#include <QDomDocument>
+#include <QList>
+#include <QMap>
+#include <QString>
+#include <QStringList>
+#include <QWidget>
 
 #include "parser_viaggiatreno_base.h"
 
@@ -81,7 +86,7 @@ public:
   private:
     QString m_categoria, m_numero, m_stazione, m_binario_prog, m_binario_reale, m_orario, m_ritardo, m_codice;
 };
-};
+}
 
 //Questa classe si occupa del parsing della pagina di ViaggiaTreno
 //con il quadro Arrivi/Partenze di una stazione
@@ -90,7 +95,7 @@ class ParserStazioneViaggiaTreno : public ParserViaggiaTrenoBase
 {
     Q_OBJECT
 public:
-    ParserStazioneViaggiaTreno(SchedaQViaggiaTreno * scheda);
+    explicit ParserStazioneViaggiaTreno(SchedaQViaggiaTreno * scheda);
 
     //imposta il testo della risposta di ViaggiaTreno che dovrà essere analizzato dal parser
     void impostaRispostaVT(const QString& rispostaVT);
@@ -132,9 +137,9 @@ public:
         return m_partenze;
     }
 private:
-    SchedaQViaggiaTreno *m_scheda;
+    SchedaQViaggiaTreno *m_scheda = nullptr;
     QString m_rispostaVT;
-    int m_riga, m_col;
+    int m_riga = -1, m_col = -1;
     QString m_err;
     QDomDocument m_docDOM;
     QString m_stazione;
@@ -151,10 +156,10 @@ class ModelloStazione: public QAbstractTableModel
 public:
     ModelloStazione(QWidget *parent, bool partenze);
 
-    virtual QVariant headerData(int section, Qt::Orientation orientation, int role = Qt::DisplayRole) const;
-    virtual QVariant data(const QModelIndex &index, int role) const;
-    virtual int rowCount(const QModelIndex &parent) const;
-    virtual int columnCount(const QModelIndex &parent) const;
+    QVariant headerData(int section, Qt::Orientation orientation, int role = Qt::DisplayRole) const override;
+    QVariant data(const QModelIndex &index, int role) const override;
+    int rowCount(const QModelIndex &parent) const override;
+    int columnCount(const QModelIndex &parent) const override;
 
     void aggiornaModello(const QList<StazioneVT::DatiTreno> &treni);
 

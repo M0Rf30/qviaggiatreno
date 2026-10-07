@@ -19,7 +19,18 @@
  ***************************************************************************/
 
 
-#include <QtGui>
+#include <QAction>
+#include <QApplication>
+#include <QCloseEvent>
+#include <QIcon>
+#include <QMenuBar>
+#include <QNetworkProxy>
+#include <QNetworkProxyFactory>
+#include <QSettings>
+#include <QSpinBox>
+#include <QStatusBar>
+#include <QTabWidget>
+#include <QToolBar>
 
 #include "schedastazione.h"
 #include "schedalistatreni.h"
@@ -28,12 +39,9 @@
 #include "download_trenord.h"
 #include "qledindicator.h"
 
-//numero versione
-QString QViaggiaTreno::s_versione = QString("2013.7");
-
 QViaggiaTreno::QViaggiaTreno()
 {
-    m_licenseDialog = 0L;
+    m_licenseDialog = nullptr;
 
     m_nam = new QNetworkAccessManager(this);
 
@@ -52,7 +60,7 @@ QViaggiaTreno::QViaggiaTreno()
     //avvia le varie classi per il download
     //per il momento esiste solo la classe per il download da viaggiatreno in futuro è conveniente
     //incapsulare l'avvio in un metodo
-    connect(m_downloadViaggiaTreno, SIGNAL(statoViaggiaTreno(bool)), this, SLOT(statoViaggiaTrenoCambiato(bool)));
+    connect(m_downloadViaggiaTreno, &DownloadViaggiaTreno::statoViaggiaTreno, this, &QViaggiaTreno::statoViaggiaTrenoCambiato);
     m_downloadViaggiaTreno->avvia();
     ripristinaSchede();
 }
@@ -64,132 +72,132 @@ void QViaggiaTreno::creaAzioni()
     m_exitAct = new QAction(QString::fromUtf8("E&sci"), this);
     m_exitAct->setShortcut(QString("Ctrl+Q"));
     m_exitAct->setStatusTip(QString::fromUtf8("Chiude l'applicazione"));
-    connect(m_exitAct, SIGNAL(triggered()), this, SLOT(close()));
+    connect(m_exitAct, &QAction::triggered, this, &QWidget::close);
 
     m_licenseAct = new QAction(QString::fromUtf8("Licen&za"), this);
     m_licenseAct->setStatusTip(QString::fromUtf8("Mostra la licenza di QViaggiaTreno"));
-    connect(m_licenseAct, SIGNAL(triggered()), this, SLOT(visualizzaLicenza()));
+    connect(m_licenseAct, &QAction::triggered, this, &QViaggiaTreno::visualizzaLicenza);
 
     m_aboutAct = new QAction(QString::fromUtf8("Informazioni &su QViaggiaTreno"), this);
     m_aboutAct->setStatusTip(QString::fromUtf8("Mostra la finestra di informazione sull'applicazione"));
-    connect(m_aboutAct, SIGNAL(triggered()), this, SLOT(about()));
+    connect(m_aboutAct, &QAction::triggered, this, &QViaggiaTreno::about);
 
     m_aboutQtAct = new QAction(QString::fromUtf8("Informazioni su &Qt"), this);
     m_aboutQtAct->setStatusTip(QString::fromUtf8("Mostra la finestra di informazioni sulla libreria Qt"));
-    connect(m_aboutQtAct, SIGNAL(triggered()), qApp, SLOT(aboutQt()));
+    connect(m_aboutQtAct, &QAction::triggered, qApp, &QApplication::aboutQt);
 
     m_nuovaStazioneAct = new QAction(QString::fromUtf8("Stazione..."), this);
     m_nuovaStazioneAct->setStatusTip(QString::fromUtf8("Controlla una stazione con ViaggiaTreno"));
     m_nuovaStazioneAct->setIcon(QIcon::fromTheme("go-home"));
-    connect(m_nuovaStazioneAct, SIGNAL(triggered()), this ,SLOT(nuovaStazione()));
+    connect(m_nuovaStazioneAct, &QAction::triggered, this, qOverload<>(&QViaggiaTreno::nuovaStazione));
 
     m_nuovoTrenoAct = new QAction(QString::fromUtf8("Treno..."), this);
     m_nuovoTrenoAct->setStatusTip(QString::fromUtf8("Controlla un treno con ViaggiaTreno"));
     m_nuovoTrenoAct->setIcon(QIcon::fromTheme("view-more-horizontal-symbolic"));
-    connect(m_nuovoTrenoAct, SIGNAL(triggered()), this, SLOT(nuovoTreno()));
+    connect(m_nuovoTrenoAct, &QAction::triggered, this, qOverload<>(&QViaggiaTreno::nuovoTreno));
 
     m_nuovaListaTreniAct = new QAction(QString::fromUtf8("Lista di treni"), this);
     m_nuovaListaTreniAct->setStatusTip(QString::fromUtf8("Controlla una lista di treni con ViaggiaTreno"));
     m_nuovaListaTreniAct->setIcon(QIcon::fromTheme("view-sort-ascending"));
-    connect(m_nuovaListaTreniAct, SIGNAL(triggered()), this, SLOT(nuovaListaTreni()));
+    connect(m_nuovaListaTreniAct, &QAction::triggered, this, &QViaggiaTreno::nuovaListaTreni);
 
     m_avvisiTrenordAct = new QAction(QString::fromUtf8("Avvisi Trenord"), this);
     m_avvisiTrenordAct->setStatusTip(QString::fromUtf8("Controlla gli avvisi di Trenord"));
     m_avvisiTrenordAct->setIcon(QIcon(":/img/trenord.png"));
-    connect(m_avvisiTrenordAct, SIGNAL(triggered()), this, SLOT(nuovaSchedaAvvisiTrenord()));
+    connect(m_avvisiTrenordAct, &QAction::triggered, this, &QViaggiaTreno::nuovaSchedaAvvisiTrenord);
 
     m_intervalloAct = new QAction(QString::fromUtf8("Cambia intervallo aggiornamento..."), this);
     m_intervalloAct->setStatusTip(QString::fromUtf8("Cambia l'intervallo di aggiornamento della scheda corrente"));
     m_intervalloAct->setIcon(QIcon::fromTheme("chronometer"));
-    connect(m_intervalloAct, SIGNAL(triggered()), this, SLOT(modificaIntervallo()));
+    connect(m_intervalloAct, &QAction::triggered, this, &QViaggiaTreno::modificaIntervallo);
     m_intervalloAct->setDisabled(true);
 
     m_avviaAct = new QAction(QString::fromUtf8("Avvia"), this);
     m_avviaAct->setStatusTip(QString::fromUtf8("Avvia/riprendi il monitoraggio con Viaggiatreno"));
     m_avviaAct->setIcon(QIcon::fromTheme("media-playback-start"));
-    connect(m_avviaAct, SIGNAL(triggered()), this, SLOT(avvia()));
+    connect(m_avviaAct, &QAction::triggered, this, &QViaggiaTreno::avvia);
     m_avviaAct->setDisabled(true);
 
     m_fermaAct = new QAction(QString::fromUtf8("Ferma"), this);
     m_fermaAct->setStatusTip(QString::fromUtf8("Interrompi il monitoraggio con ViaggiaTreno"));
     m_fermaAct->setIcon(QIcon::fromTheme("media-playback-stop"));
-    connect(m_fermaAct, SIGNAL(triggered()), this, SLOT(ferma()));
+    connect(m_fermaAct, &QAction::triggered, this, &QViaggiaTreno::ferma);
     m_fermaAct->setDisabled(true);
 
     m_fermaTutteAct = new QAction(QString::fromUtf8("Ferma tutte le schede"), this);
     m_fermaTutteAct->setStatusTip(QString::fromUtf8("Interrompi il monitoraggio con ViaggiaTreno per tutte le schede"));
-    connect(m_fermaTutteAct, SIGNAL(triggered()), this, SLOT(fermaTutte()));
+    connect(m_fermaTutteAct, &QAction::triggered, this, &QViaggiaTreno::fermaTutte);
 
     m_avviaTutteAct = new QAction(QString::fromUtf8("Avvia tutte le schede"), this);
     m_avviaTutteAct->setStatusTip(QString::fromUtf8("Avvia/riprendi il monitoraggio con ViaggiaTreno per tutte le schede"));
-    connect(m_avviaTutteAct, SIGNAL(triggered()), this, SLOT(avviaTutte()));
+    connect(m_avviaTutteAct, &QAction::triggered, this, &QViaggiaTreno::avviaTutte);
 
     m_riprovaComunicazioneConVTAct = new QAction(QString::fromUtf8("Ritenta comunicazione con &ViaggiaTreno"), this);
     m_riprovaComunicazioneConVTAct->setStatusTip(QString::fromUtf8("prova a verificare se la comunicazione con"
                                                                   "ViaggiaTreno ha ripreso a funzionare normalmente"));
-    connect(m_riprovaComunicazioneConVTAct, SIGNAL(triggered()), m_downloadViaggiaTreno, SLOT(avvia()));
+    connect(m_riprovaComunicazioneConVTAct, &QAction::triggered, m_downloadViaggiaTreno, &DownloadViaggiaTreno::avvia);
     m_riprovaComunicazioneConVTAct->setDisabled(true);
 
     m_aggiornaAct = new QAction(QString::fromUtf8("Aggiorna"), this);
     m_aggiornaAct-> setStatusTip(QString::fromUtf8("Aggiorna la scheda corrente"));
     m_aggiornaAct->setIcon(QIcon::fromTheme("view-refresh"));
-    connect(m_aggiornaAct, SIGNAL(triggered()), this, SLOT(aggiorna()));
+    connect(m_aggiornaAct, &QAction::triggered, this, &QViaggiaTreno::aggiorna);
     m_aggiornaAct->setDisabled(true);
 
     m_configuraAct = new QAction(QString::fromUtf8("Configura QViaggiaTreno..."), this);
     m_configuraAct->setStatusTip(QString::fromUtf8("Mostra la finestra di configurazione di QViaggiaTreno"));
     m_configuraAct->setIcon(QIcon::fromTheme("settings"));
-    connect(m_configuraAct, SIGNAL(triggered()), this, SLOT(configura()));
+    connect(m_configuraAct, &QAction::triggered, this, &QViaggiaTreno::configura);
 
     m_stampaSchedaAct = new QAction(QString::fromUtf8("Stam&pa scheda corrente..."), this);
     m_stampaSchedaAct->setStatusTip(QString::fromUtf8("Stampa la scheda corrente"));
     m_stampaSchedaAct->setIcon(QIcon::fromTheme("printer"));
-    connect(m_stampaSchedaAct, SIGNAL(triggered()), this, SLOT(stampaSchedaCorrente()));
+    connect(m_stampaSchedaAct, &QAction::triggered, this, &QViaggiaTreno::stampaSchedaCorrente);
     m_stampaSchedaAct->setDisabled(true);
 
     m_esportaSchedaAct = new QAction(QString::fromUtf8("Esporta sche&da corrente..."), this);
     m_esportaSchedaAct->setStatusTip(QString::fromUtf8("Esporta la scheda corrente in formato HTML o PDF"));
     m_esportaSchedaAct->setIcon(QIcon::fromTheme("document-export"));
-    connect(m_esportaSchedaAct, SIGNAL(triggered()), this, SLOT(esportaSchedaCorrente()));
+    connect(m_esportaSchedaAct, &QAction::triggered, this, &QViaggiaTreno::esportaSchedaCorrente);
     m_esportaSchedaAct->setDisabled(true);
 
     //crea azioni per i vari menu specifici per tipo di scheda
     m_cambiaNomeStazioneAct = new QAction(QString::fromUtf8("Cambia nome sta&zione..."), this);
-    connect(m_cambiaNomeStazioneAct, SIGNAL(triggered()), this, SLOT(modificaNomeStazione()));
+    connect(m_cambiaNomeStazioneAct, &QAction::triggered, this, &QViaggiaTreno::modificaNomeStazione);
 
     m_apriAct = new QAction(QString::fromUtf8("Apri..."), this);
     m_apriAct->setStatusTip(QString::fromUtf8("Apre una lista di treni"));
     m_apriAct->setIcon(QIcon::fromTheme("document-open"));
-    connect(m_apriAct, SIGNAL(triggered()), this, SLOT(apri()));
+    connect(m_apriAct, &QAction::triggered, this, &QViaggiaTreno::apri);
 
     m_salvaAct = new QAction(QString::fromUtf8("Salva"), this);
     m_salvaAct->setStatusTip(QString::fromUtf8("Salva una lista di treni"));
     m_salvaAct->setIcon(QIcon::fromTheme("document-save"));
-    connect(m_salvaAct, SIGNAL(triggered()), this, SLOT(salva()));
+    connect(m_salvaAct, &QAction::triggered, this, &QViaggiaTreno::salva);
 
     m_salvaConNomeAct = new QAction(QString::fromUtf8("Salva con nome..."), this);
     m_salvaConNomeAct->setStatusTip(QString::fromUtf8("Salva una lista di treni con un nuovo nome"));
     m_salvaConNomeAct->setIcon(QIcon::fromTheme("document-save-as"));
-    connect(m_salvaConNomeAct, SIGNAL(triggered()), this, SLOT(salvaConNome()));
+    connect(m_salvaConNomeAct, &QAction::triggered, this, &QViaggiaTreno::salvaConNome);
 
     m_aggiungiTrenoAct = new QAction(QString::fromUtf8("Aggiungi treni alla lista..."), this);
     m_aggiungiTrenoAct->setStatusTip(QString::fromUtf8("Aggiungi uno o più treni alla lista dei treni da controllare"));
     m_aggiungiTrenoAct->setIcon(QIcon::fromTheme("list-add"));
-    connect(m_aggiungiTrenoAct, SIGNAL(triggered()), this, SLOT(aggiungiTreni()));
+    connect(m_aggiungiTrenoAct, &QAction::triggered, this, &QViaggiaTreno::aggiungiTreni);
 
     m_rimuoviTrenoAct = new QAction(QString::fromUtf8("Rimuovi treni dalla lista..."), this);
     m_rimuoviTrenoAct->setStatusTip(QString::fromUtf8("Rimuovi uno o più treni dalla lista dei treni da controllare"));
     m_rimuoviTrenoAct->setIcon(QIcon::fromTheme("list-remove"));
-    connect(m_rimuoviTrenoAct, SIGNAL(triggered()), this, SLOT(rimuoviTreni()));
+    connect(m_rimuoviTrenoAct, &QAction::triggered, this, &QViaggiaTreno::rimuoviTreni);
 
     m_rimuoviTuttiAct = new QAction(QString::fromUtf8("Rimuovi tutti i treni dalla lista"), this);
     m_rimuoviTuttiAct->setStatusTip(QString::fromUtf8("Rimuovi tutti i treni dalla lista dei treni da controllare"));
     m_rimuoviTuttiAct->setIcon(QIcon::fromTheme("edit-delete"));
-    connect(m_rimuoviTuttiAct, SIGNAL(triggered()), this, SLOT(rimuoviTuttiITreni()));
+    connect(m_rimuoviTuttiAct, &QAction::triggered, this, &QViaggiaTreno::rimuoviTuttiITreni);
 
     m_impostaTitoloAct = new QAction(QString::fromUtf8("Imposta il titolo..."), this);
     m_impostaTitoloAct->setStatusTip(QString::fromUtf8("Imposta il titolo della lista di treni"));
-    connect(m_impostaTitoloAct, SIGNAL(triggered()), this, SLOT(impostaTitolo()));
+    connect(m_impostaTitoloAct, &QAction::triggered, this, &QViaggiaTreno::impostaTitolo);
 
 }
 
@@ -274,7 +282,7 @@ void QViaggiaTreno::creaToolBar()
     m_spinIntervalloAct->setDisabled(true);
 
     //connessioni
-    connect(m_spinIntervallo, SIGNAL(valueChanged(int)), this, SLOT(modificaIntervalloConSpinBox(int)));
+    connect(m_spinIntervallo, qOverload<int>(&QSpinBox::valueChanged), this, &QViaggiaTreno::modificaIntervalloConSpinBox);
 
     m_listaToolbar = addToolBar("Barra strumenti lista treni");
     m_listaToolbar->addAction(m_apriAct);
@@ -302,8 +310,8 @@ void QViaggiaTreno::creaWidgetCentrale()
     setCentralWidget(m_schede);
 
     //connessioni
-    connect(m_schede, SIGNAL(currentChanged(int)), this, SLOT(schedaCambiata(int)));
-    connect(m_schede, SIGNAL(tabCloseRequested(int)), this, SLOT(chiudiScheda(int)));
+    connect(m_schede, &QTabWidget::currentChanged, this, &QViaggiaTreno::schedaCambiata);
+    connect(m_schede, &QTabWidget::tabCloseRequested, this, &QViaggiaTreno::chiudiScheda);
 }
 
 
@@ -319,7 +327,7 @@ void QViaggiaTreno::creaStatusBar()
 
 void QViaggiaTreno::leggiImpostazioniFinestra()
 {
-    QSettings settings(QSettings::IniFormat, QSettings::UserScope, "fra74", "QViaggiaTreno");
+    QSettings settings;
 
     //legge impostazioni su posizione e dimensione finestra
     settings.beginGroup("Finestra principale");
@@ -338,7 +346,7 @@ void QViaggiaTreno::leggiImpostazioniFinestra()
 //ripristina le schede aperte nella sessione precedente di QviaggiaTreno
 void QViaggiaTreno::ripristinaSchede()
 {
-    QSettings settings(QSettings::IniFormat, QSettings::UserScope, "fra74", "QViaggiaTreno");
+    QSettings settings;
     //recupera il numero di schede da ripristinare
     settings.beginGroup("Schede aperte");
     int numero = settings.value("numero", 0).toInt();
@@ -399,7 +407,7 @@ void QViaggiaTreno::ripristinaSchede()
 
 void QViaggiaTreno::salvaSchede()
 {
-    QSettings settings(QSettings::IniFormat, QSettings::UserScope, "fra74", "QViaggiaTreno");
+    QSettings settings;
 
     //rimuove i gruppi relativi alle singole schede aperte in sessioni precedenti
     settings.beginGroup("Schede aperte");
@@ -437,7 +445,7 @@ void QViaggiaTreno::salvaSchede()
 
 void QViaggiaTreno::scriviImpostazioniFinestra()
 {
-    QSettings settings(QSettings::IniFormat, QSettings::UserScope, "fra74", "QViaggiaTreno");
+    QSettings settings;
 
     //scrive impostazioni su posizione e dimensione finestra
     settings.beginGroup("Finestra principale");
@@ -490,7 +498,7 @@ SchedaQViaggiaTreno * QViaggiaTreno::schedaCorrente()
 {
     //non ci sono schede restituisce un puntatore nullo
     if (!m_schede->count())
-        return 0L;
+        return nullptr;
     else
         return m_listaSchede.value(qobject_cast<SchedaQViaggiaTreno*>(m_schede->currentWidget())->idScheda());
 }
@@ -499,11 +507,11 @@ SchedaQViaggiaTreno* QViaggiaTreno::scheda(quint32 id)
 {
     //non ci sono schede aperte, restituisci un puntatore nullo
     if (!m_schede->count())
-        return 0L;
+        return nullptr;
 
     //non esiste una scheda con questo id
     if (!m_listaSchede.contains(id))
-        return 0L;
+        return nullptr;
     else
         return m_listaSchede[id];
 }

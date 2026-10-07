@@ -19,10 +19,87 @@
  ***************************************************************************/
 
 #include "parser_trenord.h"
-#include "schedaviaggiatreno.h"
 #include "utils.h"
-#include <QtWebKitWidgets/QWebFrame>
-#include <QtWebKitWidgets/QWebPage>
+#include <QHash>
+#include <QRegularExpression>
+#include <QStringList>
+
+namespace {
+
+// decodifica le entità HTML più comuni presenti nei valori degli attributi
+QString decodificaEntita(QString valore)
+{
+    if (!valore.contains(QLatin1Char('&')))
+        return valore;
+
+    static const QRegularExpression reNumerica(QStringLiteral("&#(?:[xX]([0-9a-fA-F]+)|([0-9]+));"));
+    QString risultato;
+    qsizetype pos = 0;
+    QRegularExpressionMatchIterator it = reNumerica.globalMatch(valore);
+    while (it.hasNext())
+    {
+        const QRegularExpressionMatch m = it.next();
+        risultato += valore.mid(pos, m.capturedStart(0) - pos);
+        const bool esadecimale = !m.captured(1).isEmpty();
+        const uint codice = esadecimale ? m.captured(1).toUInt(nullptr, 16) : m.captured(2).toUInt();
+        if (codice > 0 && codice <= 0x10FFFF)
+        {
+            const char32_t carattere = static_cast<char32_t>(codice);
+            risultato += QString::fromUcs4(&carattere, 1);
+        }
+        pos = m.capturedEnd(0);
+    }
+    risultato += valore.mid(pos);
+
+    risultato.replace(QStringLiteral("&lt;"), QStringLiteral("<"));
+    risultato.replace(QStringLiteral("&gt;"), QStringLiteral(">"));
+    risultato.replace(QStringLiteral("&quot;"), QStringLiteral("\""));
+    risultato.replace(QStringLiteral("&apos;"), QStringLiteral("'"));
+    risultato.replace(QStringLiteral("&amp;"), QStringLiteral("&"));
+    return risultato;
+}
+
+
+// attributi di un tag: nome (minuscolo) -> valore
+using Attributi = QHash<QString, QString>;
+
+// estrae gli attributi dal testo di un tag di apertura (es. "<a href='x' class=y>")
+// tollera apici singoli/doppi/assenti, maiuscole e spazi arbitrari
+Attributi estraiAttributi(const QString &tag)
+{
+    static const QRegularExpression reAttr(
+        QStringLiteral("([^\\s=/<>\"']+)(?:\\s*=\\s*(?:\"([^\"]*)\"|'([^']*)'|([^\\s>\"']+)))?"));
+
+    Attributi attributi;
+    // salta il nome del tag
+    qsizetype inizio = tag.indexOf(QRegularExpression(QStringLiteral("[\\s/]")));
+    if (inizio < 0)
+        return attributi;
+
+    QRegularExpressionMatchIterator it = reAttr.globalMatch(tag, inizio);
+    while (it.hasNext())
+    {
+        const QRegularExpressionMatch m = it.next();
+        const QString nome = m.captured(1).toLower();
+        QString valore = m.captured(2);
+        if (valore.isEmpty())
+            valore = m.captured(3);
+        if (valore.isEmpty())
+            valore = m.captured(4);
+        if (!attributi.contains(nome))
+            attributi.insert(nome, decodificaEntita(valore));
+    }
+    return attributi;
+}
+
+bool haClasse(const Attributi &attributi, const QString &classe)
+{
+    const QStringList classi = attributi.value(QStringLiteral("class"))
+                                   .split(QRegularExpression(QStringLiteral("\\s+")), Qt::SkipEmptyParts);
+    return classi.contains(classe, Qt::CaseSensitive);
+}
+
+} // namespace
 
 ParserTrenord::ParserTrenord(SchedaQViaggiaTreno *scheda)
 {
@@ -37,38 +114,61 @@ ParserTrenord::ParserTrenord(SchedaQViaggiaTreno *scheda)
 //sono presenti avvisi
 bool ParserTrenord::analizzaListaDirettrici(const QString &rispostaTN)
 {
-    QWebPage page;
+    // tag di apertura generico: gestisce '>' dentro valori fra apici
+    static const QString tagAperto = QStringLiteral("(?:\"[^\"]*\"|'[^']*'|[^>\"'])*");
+    static const QRegularExpression reLi(QStringLiteral("<li(?![\\w-])") + tagAperto + QStringLiteral(">"),
+                                         QRegularExpression::CaseInsensitiveOption);
+    static const QRegularExpression reFineLi(QStringLiteral("</li\\s*>"),
+                                             QRegularExpression::CaseInsensitiveOption);
+    static const QRegularExpression reImg(QStringLiteral("<img(?![\\w-])") + tagAperto + QStringLiteral(">"),
+                                          QRegularExpression::CaseInsensitiveOption);
+    static const QRegularExpression reA(QStringLiteral("<a(?![\\w-])") + tagAperto + QStringLiteral(">"),
+                                        QRegularExpression::CaseInsensitiveOption);
 
-    page.mainFrame()->setHtml(rispostaTN);
+    bool trovato = false;
+    QQueue<QString> direttrici;
 
-    //ottiene la lista di tutti i tag <li>, ciascuno contiene il dato di una linea...
-    QWebElementCollection lista = page.mainFrame()->findAllElements("li.direttrici-item");
+    //per ogni <li> con classe "direttrici-item" cerca il primo <img> con classe "indicator":
+    //se l'immagine contiene nel nome "indicator-on" la direttrice ha avvisi aggiornati e
+    //si accoda l'indirizzo del primo <a> contenuto nell'elemento <li>
+    QRegularExpressionMatchIterator it = reLi.globalMatch(rispostaTN);
+    while (it.hasNext())
+    {
+        const QRegularExpressionMatch li = it.next();
+        if (!haClasse(estraiAttributi(li.captured(0)), QStringLiteral("direttrici-item")))
+            continue;
 
-    if(lista.count() == 0)
+        trovato = true;
+
+        const qsizetype inizio = li.capturedEnd(0);
+        const QRegularExpressionMatch fine = reFineLi.match(rispostaTN, inizio);
+        const QString contenuto = fine.hasMatch()
+            ? rispostaTN.mid(inizio, fine.capturedStart(0) - inizio)
+            : rispostaTN.mid(inizio);
+
+        QRegularExpressionMatchIterator itImg = reImg.globalMatch(contenuto);
+        while (itImg.hasNext())
+        {
+            const Attributi img = estraiAttributi(itImg.next().captured(0));
+            if (!haClasse(img, QStringLiteral("indicator")))
+                continue;
+
+            if (img.value(QStringLiteral("src")).contains(QStringLiteral("indicator-on")))
+            {
+                const QRegularExpressionMatch a = reA.match(contenuto);
+                direttrici.enqueue(a.hasMatch()
+                                       ? estraiAttributi(a.captured(0)).value(QStringLiteral("href"))
+                                       : QString());
+            }
+            break; // conta solo il primo <img class="indicator">
+        }
+    }
+
+    if (!trovato)
         //qualcosa è andato storto, restituisci false
         return false;
 
-   m_direttrici.clear();
-
-   //per ogni direttrice controlla l'elemonto <li> ed in particolare il tag<img>
-   //se l'immagine linkata dal tag contiene nel nome "indicator-on" allora la direttrice ha
-   //avvisi aggiornati, altrimenti non fare nulla
-   for (int i = 0; i<lista.count(); i++)
-   {
-       QWebElement img = lista.at(i).findFirst("img.indicator");
-       if (!img.isNull())
-       {
-           if (img.attribute("src").contains("indicator-on"))
-           {
-               //si ci sono avvisi aggiornati
-               //estraggo dal tag <a> l'indirizzo della pagina con gli avvisi e l'aggiungo alla coda
-               //di pagine da scaricare
-               QWebElement a = lista.at(i).findFirst("a");
-               m_direttrici.enqueue(a.attribute("href"));
-           }
-       }
-   }
-
+    m_direttrici = direttrici;
     return true;
 }
 

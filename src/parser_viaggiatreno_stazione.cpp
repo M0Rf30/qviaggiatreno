@@ -21,6 +21,7 @@
 #include "parser_viaggiatreno_stazione.h"
 #include "utils.h"
 #include <QApplication>
+#include <QFont>
 #include <QPalette>
 
 
@@ -28,9 +29,6 @@
 ParserStazioneViaggiaTreno::ParserStazioneViaggiaTreno(SchedaQViaggiaTreno* scheda)
 {
     m_scheda = scheda;
-    m_err = "";
-    m_riga = m_col = -1;
-
 }
 
 //imposta il testo della risposta di viaggiatreno che dovrà essere analizzata dal parser
@@ -62,13 +60,11 @@ bool ParserStazioneViaggiaTreno::nomeStazioneAmbiguo() const
 QMap<QString, QString> ParserStazioneViaggiaTreno::listaCodiciStazioni(const QString& rispostaVT)
 {
     QDomDocument docDom;
-    QString msg;
-    int riga, col;
     QMap<QString, QString> lista;
 
     //ottiene la lista di tutti gli elementi figli del tag "select"
     //ogni nodo è un elemento "option" che contiene il nome della stazione e nell'attributo "value" il codice della stazione
-    docDom.setContent(rispostaVT, &msg, &riga, &col);
+    docDom.setContent(rispostaVT);
     QDomElement body = docDom.documentElement().firstChildElement("body");
     QDomElement corpocentrale = body.firstChildElement("div").nextSiblingElement("div");
     QDomElement form = corpocentrale.firstChildElement("form");
@@ -85,10 +81,147 @@ QMap<QString, QString> ParserStazioneViaggiaTreno::listaCodiciStazioni(const QSt
 
 }
 
+namespace {
+
+// restituisce la stringa successiva dell'iteratore, o una stringa vuota se è finito
+QString prossimaStringa(QStringListIterator &it)
+{
+    return it.hasNext() ? it.next() : QString();
+}
+
+// analizza i nodi compresi tra inizio e fine (inclusi), ciascuno rappresenta un treno
+// partenze == true --> prospetto delle partenze (il numero di minuti di ritardo è il penultimo
+// elemento del testo), altrimenti prospetto degli arrivi (è l'ultimo elemento)
+QList<StazioneVT::DatiTreno> analizzaTreni(const QDomNodeList &nodi, int inizio, int fine, bool partenze)
+{
+    QList<StazioneVT::DatiTreno> treni;
+
+    //blocco non trovato
+    if (inizio < 0 || fine < inizio)
+        return treni;
+
+    for (int j = inizio; j <= fine && j < nodi.length(); j++)
+    {
+        StazioneVT::DatiTreno treno;
+        //recupera l'elemento dom corrente
+        QDomElement elemento = nodi.at(j).toElement();
+        if (elemento.isNull())
+            continue;
+
+        //categoria e numero treno sono memorizzati in un elemento "h2", recuperiamolo
+        QDomElement elementoh2 = elemento.firstChildElement("h2");
+
+        //recupera dall'elemento h2 il testo, e lo separa in due stringhe... la prima conterrà la categoria
+        //...la seconda il numero
+        QStringList catNumeroTreno = elementoh2.text().split(" ");
+
+        //copia le rispettive stringhe nella variabile che memorizza i dati del treno
+        treno.impostaCategoria(catNumeroTreno.value(0));
+        treno.impostaNumero(catNumeroTreno.value(1));
+
+        //ricava dai due elementi "<strong>" nome della stazione di origine/destinazione
+        //e l'orario teorico di arrivo/partenza
+        QDomElement bloccotreno = elemento.firstChildElement("div");
+        QDomElement stazione = bloccotreno.firstChildElement("strong");
+
+        QDomElement orario = stazione.nextSiblingElement("strong");
+        //TODO: test
+        //treno.impostaStazione(ParserViaggiaTrenoBase::sostituisciNomeStazione(stazione.text()));
+        treno.impostaStazione(stazione.text());
+        treno.impostaOrario(orario.text());
+
+        QString datitreno = bloccotreno.text();
+
+        QStringList lista = datitreno.split(" ", Qt::SkipEmptyParts);
+
+        QStringListIterator it(lista);
+
+        //cerca la stringa "Previsto:"
+        it.findNext("Previsto:");
+        QString binario = prossimaStringa(it);
+        if (binario == "--")
+            binario = QString::fromUtf8("Sconosciuto");
+        else
+        {
+            //la string successiva o è "Binario Reale:" o fa ancora parte del numero binario
+            while (it.hasNext())
+            {
+                QString next = it.next();
+                if (next != "Binario")
+                    binario += QString(" %1").arg(next);
+                else
+                    break;
+            }
+
+        }
+
+        treno.impostaBinarioProgrammato(binario);
+
+        //riporta l'iteratore in cima alla lista
+        it.toFront();
+        //cerca la stringa "Reale:"
+        it.findNext("Reale:");
+        binario = prossimaStringa(it);
+        if (binario == "--")
+            binario = QString::fromUtf8("Sconosciuto");
+        else
+        {
+            //la stringa successiva o è "in" ("in orario") o è "ritardo" (ritardo x minuti)
+            //oppure fa ancora parte del nome del binario
+            while (it.hasNext())
+            {
+                QString next = it.next();
+                if ((next != "in") && (next != "ritardo"))
+                    binario += QString(" %1").arg(next);
+                else
+                    break;
+            }
+        }
+
+        treno.impostaBinarioReale(binario);
+
+        //individua se il treno è in orario o in ritardo
+        it.toFront();
+
+        if (it.findNext("orario"))
+            treno.impostaRitardo("0");
+        else
+        {
+            //il treno non è indicato in orario (l'indicazione vale anche per treni in anticipo
+            //quindi è in ritardo
+            it.toBack();
+            if (partenze && it.hasPrevious())
+                it.previous();
+            treno.impostaRitardo(QString::fromUtf8("+%1").arg(it.hasPrevious() ? it.previous() : QString()));
+        }
+
+        //rintraccia dal link per i dettagli del treno il codice della stazione di origine
+        QString href = elemento.firstChildElement("a").attribute("href", "");
+        QString cod = href.section("&",1,1).section("=",1,1);
+
+        if (!cod.isEmpty())
+        {
+            treno.impostaCodiceOrigine(cod);
+            //aggiunge il treno solo se ha un codice stazione di origine, questo per evitare duplicati che capitano con le S LeNord
+            treni.append(treno);
+        }
+    }
+
+    return treni;
+}
+
+} // namespace
+
 bool ParserStazioneViaggiaTreno::analizza()
 {
-    if (!m_docDOM.setContent(m_rispostaVT, &m_err, &m_riga, &m_col))
+    const QDomDocument::ParseResult risultato = m_docDOM.setContent(m_rispostaVT);
+    if (!risultato)
+    {
+        m_err = risultato.errorMessage;
+        m_riga = static_cast<int>(risultato.errorLine);
+        m_col = static_cast<int>(risultato.errorColumn);
         return false;
+    }
 
     //recupera l'elemento body
     QDomElement body = m_docDOM.documentElement().firstChildElement("body");
@@ -145,222 +278,10 @@ bool ParserStazioneViaggiaTreno::analizza()
         }
     }
 
-    //pulisci le liste
-    m_arrivi.clear();
-    m_partenze.clear();
-
     //itera lungo la lista dei nodi, partendo dal primo elemento che rappresenta un treno in partenza
-    //e finendo con l'ultimo elemento. I rispettivi indici sono memorizzati in idxInizioPartenze, idxFinePartenze
-    for (int j=inizioPartenze, i=0 ; j <= finePartenze; j++,i++)
-    {
-        StazioneVT::DatiTreno treno;
-        //recupera l'elemento dom corrente
-        QDomElement elemento = nodi.at(j).toElement();
-
-        //categoria e numero treno sono memorizzati in un elemento "h2", recuperiamolo
-        QDomElement elementoh2 = elemento.firstChildElement("h2").toElement();
-
-        //recupera dall'elemento h2 il testo, e lo separa in due stringhe... la prima conterrà la categoria
-        //...la seconda il numero
-        QStringList catNumeroTreno = elementoh2.text().split(" ");
-
-        //copia le rispettive stringhe nella variabile che memorizza i dati del treno
-        treno.impostaCategoria(catNumeroTreno[0]);
-        treno.impostaNumero(catNumeroTreno[1]);
-
-        //ricava dai due elementi "<strong>" nome della stazione di origine/destinazione
-        //e l'orario teorico di arrivo/partenza
-        QDomElement bloccotreno = elemento.firstChildElement("div");
-        QDomElement stazione = bloccotreno.firstChildElement("strong");
-
-        QDomElement orario = stazione.nextSiblingElement("strong");
-        //TODO: test
-        //treno.impostaStazione(sostituisciNomeStazione(stazione.text()));
-        treno.impostaStazione(stazione.text());
-        treno.impostaOrario(orario.text());
-
-        QString datitreno = bloccotreno.text();
-
-        QStringList lista = datitreno.split(" ", QString::SkipEmptyParts);
-
-        QStringListIterator it(lista);
-
-        //cerca la stringa "Previsto:"
-        it.findNext("Previsto:");
-        QString binario = it.next();
-        if (binario == "--")
-            binario = QString::fromUtf8("Sconosciuto");
-        else
-        {
-            //la string successiva o è "Binario Reale:" o fa ancora parte del numero binario
-            while (true)
-            {
-                QString next = it.next();
-                if (next != "Binario")
-                    binario += QString(" %1").arg(next);
-                else
-                    break;
-            }
-
-        }
-
-        treno.impostaBinarioProgrammato(binario);
-
-        //riporta l'iteratore in cima alla lista
-        it.toFront();
-        //cerca la stringa "Reale:"
-        it.findNext("Reale:");
-        binario = it.next();
-        if (binario == "--")
-            binario = QString::fromUtf8("Sconosciuto");
-        else
-        {
-            //la stringa successiva o è "in" ("in orario") o è "ritardo" (ritardo x minuti)
-            //oppure fa ancora parte del nome del binario
-            while (true)
-            {
-                QString next = it.next();
-                if ((next != "in") && (next != "ritardo"))
-                    binario += QString(" %1").arg(next);
-                else
-                    break;
-            }
-        }
-
-        treno.impostaBinarioReale(binario);
-
-        //individua se il treno è in orario o in ritardo
-        it.toFront();
-
-        if (it.findNext("orario"))
-            treno.impostaRitardo("0");
-        else
-        {
-            //il treno non è indicato in orario (l'indicazione vale anche per treni in anticipo
-            //quindi è in ritardo
-            //il numero di minuti di ritardo è nel penultimo elemento della lista
-            it.toBack();
-            it.previous();
-            treno.impostaRitardo(QString::fromUtf8("+%1").arg(it.previous()));
-        }
-
-        //rintraccia dal link per i dettagli del treno il codice della stazione di origine
-        QString href = elemento.firstChildElement("a").attribute("href", "");
-        QString cod = href.section("&",1,1).section("=",1,1);
-
-        if (!cod.isEmpty())
-        {
-            treno.impostaCodiceOrigine(cod);
-            //aggiunge il treno solo se ha un codice stazione di origine, questo per evitare duplicati che capitano con le S LeNord
-            m_partenze.append(treno);
-        }
-
-    }
-
-    //ripete la procedura anche per gli arrivi
-    for (int j=inizioArrivi, i=0 ; j <= fineArrivi; j++,i++)
-    {
-        StazioneVT::DatiTreno treno;
-        //recupera l'elemento dom corrente
-        QDomElement elemento = nodi.at(j).toElement();
-
-        //categoria e numero treno sono memorizzati in un elemento "h2", recuperiamolo
-        QDomElement elementoh2 = elemento.firstChildElement("h2").toElement();
-
-        //recupera dall'elemento h2 il testo, e lo separa in due stringhe... la prima conterrà la categoria
-        //...la seconda il numero
-        QStringList catNumeroTreno = elementoh2.text().split(" ");
-
-        //copia le rispettive stringhe nella variabile che memorizza i dati del treno
-        treno.impostaCategoria(catNumeroTreno[0]);
-        treno.impostaNumero(catNumeroTreno[1]);
-
-        //ricava dai due elementi "<strong>" nome della stazione di origine/destinazione
-        //e l'orario teorico di arrivo/partenza
-        QDomElement bloccotreno = elemento.firstChildElement("div");
-        QDomElement stazione = bloccotreno.firstChildElement("strong");
-
-        QDomElement orario = stazione.nextSiblingElement("strong");
-        //TODO: test
-        //treno.impostaStazione(sostituisciNomeStazione(stazione.text()));
-        treno.impostaStazione(stazione.text());
-         treno.impostaOrario(orario.text());
-
-        QString datitreno = bloccotreno.text();
-
-        QStringList lista = datitreno.split(" ", QString::SkipEmptyParts);
-
-        QStringListIterator it(lista);
-
-        //cerca la stringa "Previsto:"
-        it.findNext("Previsto:");
-        QString binario = it.next();
-        if (binario == "--")
-            binario = QString::fromUtf8("Sconosciuto");
-        else
-        {
-            //la string successiva o è "Binario Reale:" o fa ancora parte del numero binario
-            while (true)
-            {
-                QString next = it.next();
-                if (next != "Binario")
-                    binario += QString(" %1").arg(next);
-                else
-                    break;
-            }
-
-        }
-
-        treno.impostaBinarioProgrammato(binario);
-
-        //riporta l'iteratore in cima alla lista
-        it.toFront();
-        //cerca la stringa "Reale:"
-        it.findNext("Reale:");
-        binario = it.next();
-        if (binario == "--")
-            binario = QString::fromUtf8("Sconosciuto");
-        else
-        {
-            //la stringa successiva o è "in" ("in orario") o è "ritardo" (ritardo x minuti)
-            //oppure fa ancora parte del nome del binario
-            while (true)
-            {
-                QString next = it.next();
-                if ((next != "in") && (next != "ritardo"))
-                    binario += QString(" %1").arg(next);
-                else
-                    break;
-            }
-        }
-
-        treno.impostaBinarioReale(binario);
-
-        //individua se il treno è in orario o in ritardo
-        it.toFront();
-
-        if (it.findNext("orario"))
-            treno.impostaRitardo("0");
-        else
-        {
-            //il treno non è indicato in orario (l'indicazione vale anche per treni in anticipo
-            //quindi è in ritardo
-            //il numero di minuti di ritardo è nell'ultimo elemento della lista
-            it.toBack();
-            treno.impostaRitardo(QString::fromUtf8("+%1").arg(it.previous()));
-        }
-        //rintraccia dal link per i dettagli del treno il codice della stazione di origine
-        QString href = elemento.firstChildElement("a").attribute("href", "");
-        QString cod = href.section("&",1,1).section("=",1,1);
-
-        if (!cod.isEmpty())
-        {
-            treno.impostaCodiceOrigine(cod);
-            //aggiunge il treno solo se ha un codice stazione di origine, questo per evitare duplicati che capitano con le S LeNord
-            m_arrivi.append(treno);
-        }
-
-    }
+    //e finendo con l'ultimo elemento (ripete la procedura anche per gli arrivi)
+    m_partenze = analizzaTreni(nodi, inizioPartenze, finePartenze, true);
+    m_arrivi = analizzaTreni(nodi, inizioArrivi, fineArrivi, false);
 
     return true;
 }
@@ -468,7 +389,7 @@ QVariant ModelloStazione::data(const QModelIndex &index, int role) const
         case StazioneVT::colBinProgrammato:
         case StazioneVT::colBinReale:
         case StazioneVT::colOrario:
-        case StazioneVT::colRitardo: return Qt::AlignCenter; break;
+        case StazioneVT::colRitardo: return int(Qt::AlignCenter); break;
         }
     }
 
@@ -552,7 +473,7 @@ QVariant ModelloStazione::data(const QModelIndex &index, int role) const
         }
 
     //non previsto, ritorna un valore vuoto
-        return QVariant();
+    return QVariant();
 }
 
 

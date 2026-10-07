@@ -22,8 +22,8 @@
 #ifndef UTILS_H
 #define UTILS_H
 
-#include <QtXml>
-#include <QtWidgets>
+#include <QDomNode>
+#include <QString>
 
 //funzioni utili per il debug
 QString dumpNodo(QDomNode nodo);

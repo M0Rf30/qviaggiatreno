@@ -1,3 +1,14 @@
+2026.10
+
+  * Ported to Qt 6 (>= 6.5); build now uses CMake
+  * Removed QtWebKit dependency
+  * Added automatic tests
+  * Signal/slot connections are now verified at compile time
+  * Fixed empty license text
+  * Fixed missing tab icons
+  * Fixed station filters not working with Qt 6
+  * ViaggiaTreno status check no longer blocks the interface
+
 2013.7
 
   * Fixed Viaggiatreno URL to synchronize with the changes introduced by TI

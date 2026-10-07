@@ -25,6 +25,9 @@
 #include "schedaviaggiatreno.h"
 #include "parser_viaggiatreno_treno.h"
 
+#include <QLabel>
+#include <QListWidget>
+
 class QViaggiaTreno;
 class WidgetDatiTreno;
 
@@ -37,13 +40,14 @@ public:
     SchedaTreno(QViaggiaTreno *parent, const QString & numero, const unsigned int intervalloStandard = 2);
 
     QString numero() const;
-    virtual QString titolo( bool titoloBreve = false) const;
+    QString titolo( bool titoloBreve = false) const override;
     QString codiceOrigine() const {return m_codiceStazioneOrigine;}
-    virtual void salvaScheda(QSettings& );
+    void salvaScheda(QSettings& ) override;
 
 public slots:
-    virtual void aggiorna();
-    virtual void downloadFinito(const QString& rispostaVT);
+    void aggiorna() override;
+    void downloadFinito(const QString& rispostaVT) override;
+    void downloadFallito(const QString& errore) override;
     void cambiaCodiceOrigine(const QString& nuovoCodice);
 
 private slots:
@@ -126,7 +130,7 @@ public:
         void ridimensionaColonne();
 
 protected:
-        virtual void mouseMoveEvent(QMouseEvent *event);
+        void mouseMoveEvent(QMouseEvent *event) override;
 };
 
 

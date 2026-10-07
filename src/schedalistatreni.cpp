@@ -24,6 +24,16 @@
 #include "schedatreno.h"
 #include "utils.h"
 
+#include <QDebug>
+#include <QDir>
+#include <QFile>
+#include <QFileDialog>
+#include <QFileInfo>
+#include <QInputDialog>
+#include <QLineEdit>
+#include <QMessageBox>
+#include <QTextStream>
+
 int SchedaListaTreni::s_count = 0;
 
 SchedaListaTreni::SchedaListaTreni(QViaggiaTreno* parent, const unsigned int intervalloStandard):
@@ -33,7 +43,7 @@ SchedaListaTreni::SchedaListaTreni(QViaggiaTreno* parent, const unsigned int int
 
     m_stato = statoNuovaScheda;
     m_modificata = false;
-    m_titoloLista = "";
+    m_titoloLista = QString();
     m_idTabella = m_idNumeroAmbiguo = -1;
 
     //imposta il widget
@@ -47,14 +57,27 @@ SchedaListaTreni::SchedaListaTreni(QViaggiaTreno* parent, const unsigned int int
     m_parser = new ParserTrenoViaggiaTreno(this);
 
     //imposta connessioni
-    connect(this, SIGNAL(statoCambiato(quint32)), parent, SLOT(aggiornaStatoScheda(quint32)));
-    connect(this, SIGNAL(nomeSchedaCambiato(quint32)), parent, SLOT(aggiornaNomeScheda(quint32)));
-    connect(this, SIGNAL(apriSchedaStazione(const QString&, bool)), parent, SLOT(nuovaStazione(const QString&, bool)));
-    connect(this, SIGNAL(apriSchedaTreno(const QString&)), parent, SLOT(nuovoTreno(const QString&)));
-    connect(this, SIGNAL(GuiNonSincronizzata(quint32)), parent, SLOT(sincronizzaGUI(quint32)));
-    connect(this, SIGNAL(messaggioStatus(const QString&)), parent, SLOT(mostraMessaggioStatusBar(const QString&)));
-    connect(this, SIGNAL(downloadRiepilogoTreno(quint32, QString)), qViaggiaTreno()->downloadViaggiaTreno(), SLOT(downloadRiepilogoTreno(quint32, QString)));
-    connect(this, SIGNAL(downloadRiepilogoTreno(quint32,QString,QString)), qViaggiaTreno()->downloadViaggiaTreno(), SLOT(downloadRiepilogoTreno(quint32, QString, QString)));
+    connect(this, &SchedaListaTreni::statoCambiato, parent, &QViaggiaTreno::aggiornaStatoScheda);
+    connect(this, &SchedaListaTreni::nomeSchedaCambiato, parent, &QViaggiaTreno::aggiornaNomeScheda);
+    connect(this, &SchedaListaTreni::apriSchedaStazione, parent, [parent](const QString& stazione, bool nomeEsatto) {
+        parent->nuovaStazione(stazione, nomeEsatto);
+    });
+    connect(this, qOverload<const QString&>(&SchedaListaTreni::apriSchedaTreno), parent, [parent](const QString& treno) {
+        parent->nuovoTreno(treno);
+    });
+    connect(this, &SchedaListaTreni::GuiNonSincronizzata, parent, &QViaggiaTreno::sincronizzaGUI);
+    connect(this, &SchedaListaTreni::messaggioStatus, parent, &QViaggiaTreno::mostraMessaggioStatusBar);
+    connect(this, qOverload<quint32, const QString&>(&SchedaListaTreni::downloadRiepilogoTreno),
+            qViaggiaTreno()->downloadViaggiaTreno(), qOverload<quint32, const QString&>(&DownloadViaggiaTreno::downloadRiepilogoTreno));
+    connect(this, qOverload<quint32, const QString&, const QString&>(&SchedaListaTreni::downloadRiepilogoTreno),
+            qViaggiaTreno()->downloadViaggiaTreno(), qOverload<quint32, const QString&, const QString&>(&DownloadViaggiaTreno::downloadRiepilogoTreno));
+}
+
+SchedaListaTreni::~SchedaListaTreni()
+{
+    //i dati dei treni non hanno un QObject genitore, vanno eliminati a mano
+    qDeleteAll(m_listatreni);
+    m_listatreni.clear();
 }
 
 //restituisce una stringa con il "titolo" di questa scheda, che viene ad esempio usato come etichetta della TabBar
@@ -105,7 +128,7 @@ void SchedaListaTreni::ferma()
     SchedaQViaggiaTreno::ferma();
 
     m_codatreni.clear();
-    m_trenoAttuale = "";
+    m_trenoAttuale = QString();
 
 }
 
@@ -124,9 +147,8 @@ void SchedaListaTreni::aggiorna()
     QStringList listaNumeri = m_listatreni.keys();
 
     //e li aggiunge alla coda
-    QStringListIterator it(listaNumeri);
-    while (it.hasNext())
-        m_codatreni.enqueue(it.next());
+    for (const QString& numero : listaNumeri)
+        m_codatreni.enqueue(numero);
 
     //preleva il primo elemento dalla coda e procedi...
     prossimoTreno();
@@ -203,6 +225,15 @@ void SchedaListaTreni::downloadFinito(const QString &rispostaVT)
     }
 }
 
+//il download è fallito: svuota la coda, così la scheda non resta in attesa di una risposta che non arriverà
+void SchedaListaTreni::downloadFallito(const QString& errore)
+{
+    m_codatreni.clear();
+    m_trenoAttuale = QString();
+    SchedaQViaggiaTreno::downloadFallito(errore);
+    m_widget->impostaAggiornamento(QString::fromUtf8("Aggiornamento lista non riuscito: %1").arg(errore), true);
+}
+
 //slot
 //questo metodo risponde all'attivazione dell'azione per l'apertura di un file
 void SchedaListaTreni::apri()
@@ -225,15 +256,15 @@ void SchedaListaTreni::apriFile(const QString& filename)
         return;
     }
 
-    QString errore;
-    int riga, col;
-    if (!m_dom.setContent(&fileaperto, &errore, &riga, &col))
+    const QDomDocument::ParseResult risultato = m_dom.setContent(&fileaperto);
+    if (!risultato)
     {
         //errore nel parsing
         QMessageBox msgBox;
         msgBox.setIcon(QMessageBox::Critical);
         msgBox.setText(QString::fromUtf8("Errore durante la lettura della lista di treni."));
-        msgBox.setDetailedText(QString::fromUtf8("Ricevuto messaggio di errore %1 alla riga %2, colonna %3.").arg(errore).arg(riga).arg(col));
+        msgBox.setDetailedText(QString::fromUtf8("Ricevuto messaggio di errore %1 alla riga %2, colonna %3.")
+                               .arg(risultato.errorMessage).arg(risultato.errorLine).arg(risultato.errorColumn));
         msgBox.exec();
         return;
     }
@@ -332,10 +363,9 @@ void  SchedaListaTreni::salvaFile(const QString& filename)
     //scorre la lista dei treni monitorati
     QDomElement lista = m_dom.createElement("listatreni");
     radice.appendChild(lista);
-    QStringListIterator it(m_listatreni.keys());
-    while (it.hasNext())
+    const QStringList numeriTreni = m_listatreni.keys();
+    for (const QString& numero : numeriTreni)
     {
-        QString numero = it.next();
         QDomElement elementoTreno = m_dom.createElement("treno");
         elementoTreno.setAttribute("numero", numero);
         if (!m_listatreni[numero]->codiceOrigine().isEmpty())
@@ -345,6 +375,8 @@ void  SchedaListaTreni::salvaFile(const QString& filename)
 
     //salva l'albero DOM
     QTextStream stream(&fileDaSalvare);
+    //codifica esplicita, identica al comportamento storico su sistemi UTF-8
+    stream.setEncoding(QStringConverter::Utf8);
     m_dom.save(stream, 4);
     fileDaSalvare.close();
 
@@ -377,13 +409,13 @@ void SchedaListaTreni::aggiungiTreno(const QString& numero, const QString& codic
 //rimuove un singolo treno alla lista dei treni da monitorare
 void SchedaListaTreni::rimuoviTreno(const QString& numero)
 {
-    //rimuove il treno dalla lista dei treni
-    m_listatreni.remove(numero);
+    //rimuove il treno dalla lista dei treni ed elimina i relativi dati
+    delete m_listatreni.take(numero);
 
     //verifica che non sia nella coda dei treni, se c'è rimuovilo
     m_codatreni.removeAll(numero);
     if (m_trenoAttuale == numero)
-        m_trenoAttuale = "";
+        m_trenoAttuale = QString();
 
     m_widget->rimuoviTreno(numero);
 }
@@ -397,9 +429,9 @@ void SchedaListaTreni::aggiungiTreni()
     {
         if (!dialogo.listaVuota())
         {
-            QStringListIterator it(dialogo.listaTreni());
-            while (it.hasNext())
-                aggiungiTreno(it.next());
+            const QStringList nuoviTreni = dialogo.listaTreni();
+            for (const QString& numero : nuoviTreni)
+                aggiungiTreno(numero);
         }
     }
 
@@ -421,9 +453,9 @@ void SchedaListaTreni::rimuoviTreni()
     DialogoRimozioneTreni dialogo(m_listatreni.keys(), this);
     if (dialogo.exec() == QDialog::Accepted)
     {
-        QStringListIterator it(dialogo.listaTreni());
-        while (it.hasNext())
-            rimuoviTreno(it.next());
+        const QStringList daRimuovere = dialogo.listaTreni();
+        for (const QString& numero : daRimuovere)
+            rimuoviTreno(numero);
     }
 
     m_modificata = true;
@@ -442,9 +474,10 @@ void SchedaListaTreni::rimuoviTuttiITreni()
 
     //rimuovi tutti i treni dalla coda
     m_codatreni.clear();
-    m_trenoAttuale = "";
+    m_trenoAttuale = QString();
 
     //elimina la lista di treni
+    qDeleteAll(m_listatreni);
     m_listatreni.clear();
 
     m_modificata = true;
@@ -463,7 +496,6 @@ void SchedaListaTreni::prossimoTreno()
 
     m_trenoAttuale = m_codatreni.dequeue();
 
-    QString temp = m_listatreni[m_trenoAttuale]->codiceOrigine();
 
     if (m_listatreni[m_trenoAttuale]->codiceOrigine().isEmpty())
         emit (downloadRiepilogoTreno(idScheda(), m_trenoAttuale));
@@ -478,7 +510,8 @@ void SchedaListaTreni::salvaScheda(QSettings& settings)
     {
         int risposta = QMessageBox::warning(this, QString::fromUtf8("La scheda è modificata"),
                                             QString::fromUtf8("La scheda <b>'%1'</b> è stata modificata, ma la lista di treni non è ancora stata salvata e non ne sarà possibile il ripristino.<br>"
-                                                              "Si desidera salvare la lista?").arg(titolo(true)), QMessageBox::Yes, QMessageBox::No);
+                                                              "Si desidera salvare la lista?").arg(titolo(true)),
+                                            QMessageBox::Yes | QMessageBox::No, QMessageBox::No);
 
         if (risposta == QMessageBox::Yes)
             salva();
@@ -491,7 +524,9 @@ void SchedaListaTreni::salvaScheda(QSettings& settings)
 
 void SchedaListaTreni::cambiaCodiceOrigine(const QString &nuovoCodice)
 {
-    m_listatreni[m_trenoAmbiguo]->impostaCodiceOrigine(nuovoCodice);
+    //il treno ambiguo potrebbe essere stato rimosso nel frattempo
+    if (ListaVT::DatiTreno* treno = m_listatreni.value(m_trenoAmbiguo, nullptr))
+        treno->impostaCodiceOrigine(nuovoCodice);
     aggiorna();
     avvia();
 }

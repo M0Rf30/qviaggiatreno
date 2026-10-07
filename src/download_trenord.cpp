@@ -26,12 +26,24 @@
 #include "utils.h"
 #include "parser_trenord.h"
 
+#include <QCoreApplication>
+#include <QNetworkReply>
+#include <QNetworkRequest>
+#include <QUrl>
+
+namespace {
+//indirizzo base del sito Trenord
+const QString s_urlBaseTrenord = QStringLiteral("http://www.trenord.it");
+//timeout (in ms) delle richieste
+const int s_timeoutRichiesta = 30000;
+}
+
 DownloadTrenord::DownloadTrenord(QViaggiaTreno *qvt, QNetworkAccessManager *nam)
 {
     m_qvt = qvt;
     m_nam = nam;
-    m_parser = 0L;
     m_timerAvvisi = new QTimer(this);
+    connect(m_timerAvvisi, &QTimer::timeout, this, &DownloadTrenord::scaricaNuovaDirettrice);
 }
 
 //richiede al sito webTrenord la pagina con la lista delle direttrici
@@ -40,26 +52,34 @@ void DownloadTrenord::aggiornaListaDirettrici()
     QNetworkRequest request;
 
     //invia una richiesta HTTP GET per scaricare la pagina con la lista delle direttrici
-    request.setUrl(QUrl("http://www.trenord.it/mobile/it/breaking-news.aspx"));
+    request.setUrl(QUrl(s_urlBaseTrenord + "/mobile/it/breaking-news.aspx"));
+    request.setHeader(QNetworkRequest::UserAgentHeader,
+                      QStringLiteral("QViaggiaTreno/") + QCoreApplication::applicationVersion());
+    request.setTransferTimeout(s_timeoutRichiesta);
     request.setOriginatingObject(sender());
     QNetworkReply* reply = m_nam->get(request);
 
-    connect(reply, SIGNAL(finished()), this, SLOT(downloadFinito()));
+    connect(reply, &QNetworkReply::finished, this, &DownloadTrenord::downloadFinito);
 }
 
 void DownloadTrenord::downloadFinito()
 {
     QNetworkReply* reply = qobject_cast<QNetworkReply*>(sender());
-    QString risposta = QString::fromUtf8(reply->readAll());
+    if (!reply)
+        return;
+    reply->deleteLater();
 
     //recupera il puntatore della scheda che ha inviato la richiesta di download
     SchedaQViaggiaTreno *scheda = qobject_cast<SchedaQViaggiaTreno*>(reply->request().originatingObject());
 
     //controlla se la scheda è aperta, se lo è richiama il metodo downloadFinito della scheda
     if (m_qvt->schedaAperta(scheda))
-        scheda->downloadFinito(risposta);
-
-    reply->deleteLater();
+    {
+        if (reply->error() != QNetworkReply::NoError)
+            scheda->downloadFallito(reply->errorString());
+        else
+            scheda->downloadFinito(QString::fromUtf8(reply->readAll()));
+    }
 }
 
 void DownloadTrenord::scaricaAvvisi(ParserTrenord *parser)
@@ -74,8 +94,6 @@ void DownloadTrenord::scaricaAvvisi(ParserTrenord *parser)
     //imposta il timer
     //TODO: per il momento scarica gli avvisi con un intervallo fisso di 1 s, successivamente da configurare
     m_timerAvvisi->setInterval(1000);
-    connect(m_timerAvvisi, SIGNAL(timeout()), this, SLOT(scaricaNuovaDirettrice()));
-
     m_timerAvvisi->start();
 }
 
@@ -90,11 +108,12 @@ void DownloadTrenord::scaricaNuovaDirettrice()
     if (!m_coda.count())
     {
         //TODO: questo e' il punto in cui si può aggiornare il modello!
-        disconnect(m_timerAvvisi);
         m_timerAvvisi->stop();
         return;
     }
 
-    QString url = QString("http://www.trenord.it%1").arg(m_coda.dequeue());
+    //TODO: il download della pagina della direttrice non è ancora implementato
+    const QString url = s_urlBaseTrenord + m_coda.dequeue();
+    Q_UNUSED(url)
 
 }

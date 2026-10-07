@@ -19,7 +19,12 @@
  ***************************************************************************/
 
 
-#include <QtGui>
+#include <QApplication>
+#include <QCoreApplication>
+#include <QLibraryInfo>
+#include <QLocale>
+#include <QSettings>
+#include <QTranslator>
 
 #include "qviaggiatreno.h"
 
@@ -28,13 +33,22 @@ int main(int argc, char *argv[])
 	Q_INIT_RESOURCE(application);
 	QApplication app(argc, argv);
 
+	//le impostazioni vanno configurate prima di creare qualsiasi finestra
+	QCoreApplication::setOrganizationName("fra74");
+	QCoreApplication::setApplicationName("QViaggiaTreno");
+	QCoreApplication::setApplicationVersion(QString::fromUtf8(QVT_VERSION));
+	QSettings::setDefaultFormat(QSettings::IniFormat);
+
+	//traduzioni di Qt per la lingua di sistema, con ripiego sulla traduzione italiana inclusa
 	QTranslator qTranslator;
-	qTranslator.load(":/traduzioni/qt_it.qm");
+	if (!qTranslator.load(QLocale(), "qtbase", "_", QLibraryInfo::path(QLibraryInfo::TranslationsPath)))
+	{
+		if (!qTranslator.load(":/traduzioni/qt_it.qm"))
+			qWarning("Impossibile caricare le traduzioni di Qt");
+	}
 	app.installTranslator(&qTranslator);
 
-	QViaggiaTreno * mw = new QViaggiaTreno();
-	mw->show();
+	QViaggiaTreno mw;
+	mw.show();
 	return app.exec();
 }
-
-	

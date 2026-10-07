@@ -2,7 +2,24 @@
 
 QViaggiaTreno è un front-end grafico a ViaggiaTreno, il servizio web di Trenitalia con informazioni in tempo reale sulla circolazione dei treni passeggeri.
 
-È scritto utilizzando le librerie Qt 5 e seguenti  e può essere eseguito sotto Linux, Windows e Mac
+È scritto utilizzando le librerie Qt 6 (>= 6.5)  e può essere eseguito sotto Linux, Windows e Mac
+
+## Compilazione
+
+Dipendenze: CMake, un compilatore C++17 e Qt 6 (>= 6.5) con i moduli Core, Gui, Widgets, Network, Xml e Test.
+
+* Debian/Ubuntu: `sudo apt install cmake g++ qt6-base-dev qt6-base-dev-tools`
+* Arch: `sudo pacman -S cmake gcc qt6-base`
+* Fedora: `sudo dnf install cmake gcc-c++ qt6-qtbase-devel`
+
+```
+cmake -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build
+ctest --test-dir build
+sudo cmake --install build
+```
+
+I test usano QtTest; in assenza di display impostare `QT_QPA_PLATFORM=offscreen`.
 
 ## Ringraziamenti
 

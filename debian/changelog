@@ -1,3 +1,14 @@
+qviaggiatreno (2026.10-1) UNRELEASED; urgency=medium
+
+  * Port to Qt 6 and CMake; drop QtWebKit and qmake.
+  * Build-depend on qt6-base-dev and debhelper-compat (= 13).
+  * Drop debian/compat, debian/menu, debian/dirs and debian/*.install:
+    files are installed by CMake.
+  * Run the automatic tests at build time (QT_QPA_PLATFORM=offscreen).
+  * Bump Standards-Version to 4.7.0, update Homepage.
+
+ -- Gianluca Boiano <morf3089@gmail.com>  Wed, 07 Oct 2026 12:00:00 +0200
+
 qviaggiatreno (2013.7.3-8) unstable; urgency=medium
 
   * Update my uid.

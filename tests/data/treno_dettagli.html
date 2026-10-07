@@ -1,0 +1,24 @@
+<html>
+<head>
+<title>Dettagli treno</title>
+<!--
+Struttura attesa da ParserTrenoViaggiaTreno::analizzaDettagli:
+html/body con una sequenza di div (nessun annidamento). I primi due (partenza, arrivo) e gli ultimi due
+sono ignorati; ogni div intermedio e' una fermata:
+  class="corpocentrale" = fermata non ancora effettuata, altra classe = effettuata
+  h2: nome; p/strong: orario programmato; secondo p/strong: orario reale (o stimato se non effettuata)
+  nodi di testo diretti per i binari (4 nodi: previsto e reale non in grassetto; 3 nodi: uno dei due e' in strong)
+  un testo contenente "soppressa" indica la fermata soppressa
+-->
+</head>
+<body>
+<div>partenza</div>
+<div>arrivo</div>
+<div class="visitata"><h2>MONZA</h2><p>Programmata: <strong>10:30</strong></p><p>Effettiva: <strong>10:31</strong></p>Binario<br/>3<br/>Reale <strong>4</strong></div>
+<div class="corpocentrale"><h2>LECCO</h2><p>Programmata: <strong>10:50</strong></p><p>Stimata: <strong>10:55</strong></p>Prog<br/>5<br/>Binario reale <strong>6</strong></div>
+<div class="corpocentrale"><h2>COLICO</h2><p>Programmata: <strong>11:10</strong></p><p>Stimata: <strong>11:15</strong></p><em>fermata soppressa</em>Binario<br/>7<br/>Reale<br/>8</div>
+<div class="corpocentrale"><h2>SONDRIO</h2><p>Programmata: <strong>11:40</strong></p><p>Stimata: <strong>11:45</strong></p>Binario <strong>9</strong><br/>Reale<br/>--</div>
+<div>coda 1</div>
+<div>coda 2</div>
+</body>
+</html>

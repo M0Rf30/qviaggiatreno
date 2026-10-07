@@ -25,6 +25,13 @@
 #include "schedaviaggiatreno.h"
 #include "parser_viaggiatreno_treno.h"
 
+#include <QDialog>
+#include <QDialogButtonBox>
+#include <QLabel>
+#include <QListWidget>
+#include <QMap>
+#include <QQueue>
+
 class QViaggiaTreno;
 class WidgetListaTreni;
 
@@ -36,11 +43,12 @@ class SchedaListaTreni: public SchedaQViaggiaTreno
 
 public:
     SchedaListaTreni(QViaggiaTreno* parent, const unsigned int intervalloStandard = 3);
+    ~SchedaListaTreni() override;
 
-    virtual void avvia();
-    virtual void ferma();
-    virtual void aggiorna();
-    virtual QString titolo(bool = false) const;
+    void avvia() override;
+    void ferma() override;
+    void aggiorna() override;
+    QString titolo(bool = false) const override;
     void impostaTitolo();
 
     bool modificata() const {return m_modificata; }
@@ -48,7 +56,7 @@ public:
 
     void apriFile(const QString& filename);
 
-    virtual void salvaScheda(QSettings& settings);
+    void salvaScheda(QSettings& settings) override;
 
 public slots:
     void apri();
@@ -57,12 +65,11 @@ public slots:
     void aggiungiTreni();
     void rimuoviTreni();
     void rimuoviTuttiITreni();
-    virtual void downloadFinito(const QString& rispostaVT);
-
-
+    void downloadFinito(const QString& rispostaVT) override;
+    void downloadFallito(const QString& errore) override;
+    void cambiaCodiceOrigine(const QString& nuovoCodice);
 
 private slots:
-    void cambiaCodiceOrigine(const QString& nuovoCodice);
 
 private:
     static int s_count;
@@ -167,7 +174,7 @@ class TabellaLista : public QTableWidget
 public:
     TabellaLista(QWidget* parent);
 
-    void mouseMoveEvent(QMouseEvent *event);
+    void mouseMoveEvent(QMouseEvent *event) override;
 };
 
 

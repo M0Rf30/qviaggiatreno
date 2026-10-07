@@ -23,6 +23,7 @@
 #define PARSER_VIAGGIATRENO_BASE_H
 
 #include <QObject>
+#include <QString>
 
 class ParserViaggiaTrenoBase : public QObject
 {

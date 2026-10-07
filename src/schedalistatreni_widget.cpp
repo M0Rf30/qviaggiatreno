@@ -21,6 +21,18 @@
 #include "schedalistatreni.h"
 #include "items.h"
 
+#include <QApplication>
+#include <QDialogButtonBox>
+#include <QHBoxLayout>
+#include <QHeaderView>
+#include <QIntValidator>
+#include <QLabel>
+#include <QLineEdit>
+#include <QListWidget>
+#include <QMouseEvent>
+#include <QPushButton>
+#include <QVBoxLayout>
+
 WidgetListaTreni::WidgetListaTreni(SchedaListaTreni* parent): QWidget(parent)
 {
     //imposta il layout del widget;
@@ -66,10 +78,10 @@ WidgetListaTreni::WidgetListaTreni(SchedaListaTreni* parent): QWidget(parent)
     //connessioni
     //	connect(m_tabella, SIGNAL(cellEntered(int, int)), this, SLOT(ingressoCella(int, int)));
     //connect(m_tabella, SIGNAL(itemActivated(QTableWidgetItem *)), this, SLOT(itemAttivato(QTableWidgetItem*)));
-    connect(m_tabella, SIGNAL(itemClicked(QTableWidgetItem *)), this, SLOT(itemAttivato(QTableWidgetItem*)));
+    connect(m_tabella, &QTableWidget::itemClicked, this, &WidgetListaTreni::itemAttivato);
 
-    connect(this, SIGNAL(apriSchedaStazione(const QString&, bool)), parent, SIGNAL(apriSchedaStazione(const QString&, bool)));
-    connect(this, SIGNAL(apriSchedaTreno(const QString&)), parent, SIGNAL(apriSchedaTreno(const QString&)));
+    connect(this, &WidgetListaTreni::apriSchedaStazione, parent, &SchedaListaTreni::apriSchedaStazione);
+    connect(this, &WidgetListaTreni::apriSchedaTreno, parent, qOverload<const QString&>(&SchedaListaTreni::apriSchedaTreno));
 }
 
 void WidgetListaTreni::itemAttivato(QTableWidgetItem* item)
@@ -148,7 +160,7 @@ int WidgetListaTreni::larghezzaItem(const QTableWidgetItem* item)
         return -1;
 
     QFontMetrics fm(item->font());
-    int larghezza = fm.width(item->text());
+    int larghezza = fm.horizontalAdvance(item->text());
     return larghezza;
 }
 
@@ -258,9 +270,9 @@ DialogoAggiuntaTreni::DialogoAggiuntaTreni(QWidget *parent) : QDialog(parent)
     m_listwidget->setSortingEnabled(true);
 
     //connessioni
-    connect(buttonBox, SIGNAL(accepted()), this, SLOT(accept()));
-    connect(buttonBox, SIGNAL(rejected()), this, SLOT(reject()));
-    connect(aggiungi, SIGNAL(clicked()), this, SLOT(aggiungiTreno()));
+    connect(buttonBox, &QDialogButtonBox::accepted, this, &DialogoAggiuntaTreni::accept);
+    connect(buttonBox, &QDialogButtonBox::rejected, this, &DialogoAggiuntaTreni::reject);
+    connect(aggiungi, &QPushButton::clicked, this, &DialogoAggiuntaTreni::aggiungiTreno);
 }
 
 //elimina tutti i treni dalla tabella
@@ -343,9 +355,9 @@ DialogoRimozioneTreni::DialogoRimozioneTreni(const QStringList& lista, QWidget *
     m_buttonBox->buttons().at(0)->setEnabled(false);
 
     //connessioni
-    connect(m_buttonBox, SIGNAL(accepted()), this, SLOT(accept()));
-    connect(m_buttonBox, SIGNAL(rejected()), this, SLOT(reject()));
-    connect(m_listwidget, SIGNAL(itemSelectionChanged()), this, SLOT(selezioneModificata()));
+    connect(m_buttonBox, &QDialogButtonBox::accepted, this, &DialogoRimozioneTreni::accept);
+    connect(m_buttonBox, &QDialogButtonBox::rejected, this, &DialogoRimozioneTreni::reject);
+    connect(m_listwidget, &QListWidget::itemSelectionChanged, this, &DialogoRimozioneTreni::selezioneModificata);
 }
 
 //slot
@@ -392,7 +404,7 @@ void TabellaLista::mouseMoveEvent(QMouseEvent *event)
     //cambia cursore solo se c'è almeno un treno in lista
     if (columnCount() != 0)
     {
-        int riga = rowAt(event->y());
+        int riga = rowAt(event->position().toPoint().y());
         if (riga == ListaVT::rigaNumero || riga == ListaVT::rigaOrigine || riga == ListaVT::rigaDestinazione || riga == ListaVT::rigaUltimaFermata )
             setCursor(Qt::PointingHandCursor);
         else

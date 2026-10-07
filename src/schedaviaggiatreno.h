@@ -22,9 +22,13 @@
 #ifndef SCHEDAVIAGGIATRENO_H
 #define SCHEDAVIAGGIATRENO_H
 //
-#include <QtWidgets>
-#include <QtNetwork>
-#include <QtXml>
+#include <QStackedWidget>
+#include <QTableWidgetItem>
+#include <QTextDocument>
+#include <QDateTime>
+#include <QSettings>
+#include <QTimer>
+#include <QString>
 
 class QViaggiaTreno;
 
@@ -63,9 +67,11 @@ public:
 
     virtual void salvaScheda(QSettings & /*settings*/) {}
 
-public slots:
+public Q_SLOTS:
     virtual void aggiorna();
     virtual void downloadFinito(const QString&) {}
+    //chiamato dal livello di rete quando il download è fallito: la scheda passa in stato di errore
+    virtual void downloadFallito(const QString& errore);
     virtual void stampa() {}
     virtual void esporta() {}
 
@@ -84,9 +90,9 @@ protected:
     static QString statoMonitoraggioFermato;
     static QString statoErrore;
 
-    void cambiaStato(QString nuovoStato);
+    void cambiaStato(const QString& nuovoStato);
 
-protected slots:
+protected Q_SLOTS:
 
 private:
     QViaggiaTreno* m_qviaggiatreno;
@@ -98,7 +104,7 @@ private:
 private:
    virtual QTextDocument* creaTextDocument() {return  new QTextDocument(this);}
 
-signals:
+Q_SIGNALS:
     void GuiNonSincronizzata(quint32 id);
     void statoCambiato(quint32 id);
     void nomeSchedaCambiato(quint32 id);

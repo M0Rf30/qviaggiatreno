@@ -21,7 +21,7 @@
 #ifndef PARSER_VIAGGIATRENO_LISTA_H
 #define PARSER_VIAGGIATRENO_LISTA_H
 
-#include <QtXml>
+#include <QDomDocument>
 
 class SchedaQViaggiaTreno;
 

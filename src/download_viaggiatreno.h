@@ -21,12 +21,21 @@
 #ifndef DOWNLOAD_VIAGGIATRENO_H
 #define DOWNLOAD_VIAGGIATRENO_H
 
-#include <QtNetwork>
+#include <QDateTime>
+#include <QList>
+#include <QMap>
+#include <QNetworkAccessManager>
+#include <QObject>
+#include <QPair>
+#include <QQueue>
+#include <QString>
 
 class QViaggiaTreno;
 class DownloadViaggiaTreno;
 class DownloadViaggiaTrenoItem;
 class SchedaQViaggiaTreno;
+class QNetworkReply;
+class QTimer;
 
 //questa classe è la classe in cui viene centralizzato il download delle schede
 //da viaggiatreno
@@ -69,6 +78,9 @@ private:
 	//il corretto parsing da parte della classe QDom
 	QString correggiOutputVT(QString testoVT);
 
+	void inviaPost(DownloadViaggiaTrenoItem *item, const QString& percorso,
+				   const QList<QPair<QString, QString>>& parametri);
+	void inviaGet(DownloadViaggiaTrenoItem *item, const QString& indirizzo);
 	void richiestaHTTPStazioneConNome(DownloadViaggiaTrenoItem *item);
 	void richiestaHTTPStazioneConCodice(DownloadViaggiaTrenoItem *item);
 	void richiestaHTTPRiepilogoTreno(DownloadViaggiaTrenoItem* item);
@@ -79,32 +91,16 @@ private:
 private slots:
 	void download();
     void downloadEffettuato();
-    bool controllaViaggiaTreno();
+    void controllaViaggiaTreno();
+    void controlloTerminato();
 
 private:
 	QViaggiaTreno* m_qvt;
 	QNetworkAccessManager* m_nam;
-	//intervallo tra due download successivi dal server di viaggiatreno
-	int m_intervalloDownload;
-	//intervallo di aggiornamento delle cache
-	int m_intervalloAggiornamentoCache;
-	//tempo in cui una scheda rimane in cache
-	int m_tempoCache;
 	QQueue<DownloadViaggiaTrenoItem*> m_codaDownload;
     QTimer *m_timerDownload, *m_timerControlloVT;
-
-    //costanti
-    //valore di default dell'intervallo di download (in ms)
-    static const int s_intervalloDownload;
-
-    //valore di default dell'intervallo di aggiornamento della cache (in ms)
-    static const int s_intervalloAggiornamentoCache;
-
-    //valore di default del tempo di permanenza in cache (in s)
-    static const int s_tempoCache;
-
-    //valore di default dell'intervallo di controllo del corretto funzionamento di Viaggiatreno (in m)
-    static const int s_itervalloCheckViaggiaTreno;
+    //controllo di funzionamento di ViaggiaTreno in corso (nullptr se nessuno)
+    QNetworkReply *m_controlloInCorso = nullptr;
 };
 
 //l'enum elenca i tipi diversi di dati possibili scaricabili da viaggiatreno

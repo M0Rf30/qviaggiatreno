@@ -43,15 +43,15 @@ class SchedaAvvisiTrenord: public SchedaQViaggiaTreno
 public:
     SchedaAvvisiTrenord(QViaggiaTreno* parent, const unsigned int intervalloStandard = 5);
 
-    QString titolo(bool = false) const {return QString::fromUtf8("Avvisi Trenord");}
+    QString titolo(bool = false) const override {return QString::fromUtf8("Avvisi Trenord");}
 
-    virtual void avvia();
-    virtual void ferma();
-    virtual void aggiorna();
+    void avvia() override;
+    void ferma() override;
+    void aggiorna() override;
 
-    virtual void downloadFinito(const QString &);
+    void downloadFinito(const QString &) override;
 
-    virtual ~SchedaAvvisiTrenord();
+    ~SchedaAvvisiTrenord() override;
 
 
 private:
@@ -59,7 +59,7 @@ private:
     ParserTrenord* m_parser;
     ModelloAvvisiTrenord *m_avvisi;
 
- signals:
+Q_SIGNALS:
     void aggiornaListaDirettrici();
 };
 

@@ -3,19 +3,12 @@ Section: misc
 Priority: optional
 Maintainer: Davide Puricelli (evo) <evo@debian.org>
 Uploaders: Gianfranco Costamagna <locutusofborg@debian.org>
-Build-Depends: debhelper (>= 9),
-               libglib2.0-dev,
-               libqt5opengl5-dev,
-               libqt5webkit5-dev,
-               libsqlite3-dev,
-               libxml2-dev,
-               libxslt1-dev,
-               qtbase5-dev,
-               qtdeclarative5-dev
-#               libgstreamer-plugins-base1.0-dev,
-#               libgstreamer1.0-dev,
-Standards-Version: 3.9.6
-Homepage: https://xp-dev.com/forum/57
+Build-Depends: cmake,
+               debhelper-compat (= 13),
+               qt6-base-dev,
+               qt6-base-dev-tools
+Standards-Version: 4.7.0
+Homepage: https://github.com/M0Rf30/qviaggiatreno
 
 Package: qviaggiatreno
 Architecture: any

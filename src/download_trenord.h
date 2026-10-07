@@ -20,10 +20,17 @@
 #ifndef DOWNLOAD_TRENORD_H
 #define DOWNLOAD_TRENORD_H
 
-#include <QtNetwork>
+#include <QNetworkAccessManager>
+#include <QObject>
+#include <QQueue>
+#include <QString>
+#include <QTimer>
 
 class QViaggiaTreno;
 class ParserTrenord;
+
+// il tipo usato nella firma di uno slot deve essere completo nel codice generato da moc
+Q_MOC_INCLUDE("parser_trenord.h")
 
 //Questa classe è la classe in cui viene centralizzato il download dal sito Trenord
 class DownloadTrenord :public QObject
@@ -41,7 +48,7 @@ public slots:
     private:
     QViaggiaTreno *m_qvt;
     QNetworkAccessManager* m_nam;
-    ParserTrenord *m_parser;
+    ParserTrenord *m_parser = nullptr;
     QQueue<QString> m_coda;
 
     QTimer* m_timerAvvisi;

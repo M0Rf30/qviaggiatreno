@@ -26,7 +26,7 @@ WidgetAvvisiTrenord::WidgetAvvisiTrenord(QWidget *parent, ModelloAvvisiTrenord* 
 
     QFont font = labelTitolo->font();
     font.setBold(true);
-        font.setPointSize(font.pointSize()*1.5);
+        font.setPointSize(qRound(font.pointSize()*1.5));
     labelTitolo->setFont(font);
 
     tabellaAvvisi->setModel(avvisi);
