@@ -74,10 +74,6 @@ public slots:
 
 
 private:
-	//corregge alcuni errori nel codice XHTML generato da viaggiatreno che ne impediscono
-	//il corretto parsing da parte della classe QDom
-	QString correggiOutputVT(QString testoVT);
-
 	void inviaPost(DownloadViaggiaTrenoItem *item, const QString& percorso,
 				   const QList<QPair<QString, QString>>& parametri);
 	void inviaGet(DownloadViaggiaTrenoItem *item, const QString& indirizzo);

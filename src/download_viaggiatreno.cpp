@@ -19,6 +19,7 @@
  ***************************************************************************/
 
 #include "download_viaggiatreno.h"
+#include "parser_viaggiatreno_base.h"
 #include "qviaggiatreno.h"
 #include "schedaviaggiatreno.h"
 
@@ -31,7 +32,9 @@
 
 namespace {
 //indirizzo base del servizio mobile di ViaggiaTreno
-const QString s_urlBaseVT = QStringLiteral("http://mobile.viaggiatreno.it/vt_pax_internet/mobile");
+//nota: mobile.viaggiatreno.it risponde con un redirect 301 verso www.viaggiatreno.it,
+//e seguendo il redirect le richieste POST diventano GET perdendo i dati del form
+const QString s_urlBaseVT = QStringLiteral("http://www.viaggiatreno.it/vt_pax_internet/mobile");
 //timeout (in ms) delle richieste di download dati
 const int s_timeoutRichiesta = 30000;
 
@@ -69,22 +72,6 @@ DownloadViaggiaTreno::DownloadViaggiaTreno(QViaggiaTreno* qvt, QNetworkAccessMan
     m_timerControlloVT = new QTimer(this);
     connect(m_timerControlloVT, &QTimer::timeout, this, &DownloadViaggiaTreno::controllaViaggiaTreno);
     connect(m_timerDownload, &QTimer::timeout, this, &DownloadViaggiaTreno::download);
-}
-
-QString DownloadViaggiaTreno::correggiOutputVT(QString testoVT)
-{
-    //effettua alcune sostituzione nel codice XHTML generato da ViaggiaTreno, che NON è valido
-    //sostituisci <br> con <br/>
-    QString temp = testoVT.simplified();
-    //sostutuisce l'entità per gli accenti....
-    temp.replace("&#039;", "'");
-    //sostituisce gli ampersend negli URL con &amp;
-    temp.replace("&", "&amp;");
-    // sostituisce <br> con <br/>
-    temp.replace("<br>", "<br/>");
-    temp.replace("</strong> <br/> <br/>", "</strong> </p> <br/>");
-
-    return temp;
 }
 
 
@@ -275,7 +262,7 @@ void DownloadViaggiaTreno::downloadEffettuato()
         else
         {
             //il file XHTML generato da viaggiatreno non è sintatticamente corretto, vanno corretti alcuni errori
-            const QString risposta = correggiOutputVT(QString::fromUtf8(reply->readAll()));
+            const QString risposta = ParserViaggiaTrenoBase::correggiOutputVT(QString::fromUtf8(reply->readAll()));
             scheda->downloadFinito(risposta);
         }
     }

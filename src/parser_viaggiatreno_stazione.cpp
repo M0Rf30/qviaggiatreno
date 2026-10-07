@@ -113,7 +113,8 @@ QList<StazioneVT::DatiTreno> analizzaTreni(const QDomNodeList &nodi, int inizio,
 
         //recupera dall'elemento h2 il testo, e lo separa in due stringhe... la prima conterrà la categoria
         //...la seconda il numero
-        QStringList catNumeroTreno = elementoh2.text().split(" ");
+        //il testo può avere spazi iniziali (es. "<h2> FR 9727</h2>"), che sposterebbero i campi
+        QStringList catNumeroTreno = elementoh2.text().split(QLatin1Char(' '), Qt::SkipEmptyParts);
 
         //copia le rispettive stringhe nella variabile che memorizza i dati del treno
         treno.impostaCategoria(catNumeroTreno.value(0));

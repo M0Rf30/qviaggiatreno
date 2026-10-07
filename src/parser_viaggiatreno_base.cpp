@@ -20,6 +20,8 @@
 
 #include "parser_viaggiatreno_base.h"
 
+#include <QRegularExpression>
+
 //sostituisce il nome della stazione per ovviare ad alcuni bug di ViaggiaTreno che fanno si che in
 //alcuni casi i nomi delle stazioni siano incoerenti
 //per esempio sulla rete FNM i treni vengono riportati con origine destinazione "M N Cadorna" ma poi
@@ -33,4 +35,24 @@ QString ParserViaggiaTrenoBase::sostituisciNomeStazione(const QString &nome)
         return QString(nome).replace("CAMNAGO LENTATE", "CAMNAGO-LENTATE", Qt::CaseInsensitive);
 
     return nome;
+}
+
+QString ParserViaggiaTrenoBase::correggiOutputVT(const QString &testoVT)
+{
+    QString temp = testoVT.simplified();
+    //l'intestazione contiene script e tag non chiusi iniettati dal sito (es. monitoraggio RUM)
+    //che rendono il documento non ben formato; ai parser serve solo il body, quindi si scarta
+    static const QRegularExpression reHead(QStringLiteral("<head(\\s[^>]*)?>.*</head>"),
+                                           QRegularExpression::CaseInsensitiveOption
+                                               | QRegularExpression::InvertedGreedinessOption);
+    temp.replace(reHead, QStringLiteral("<head/>"));
+    //sostituisce l'entità per gli accenti....
+    temp.replace("&#039;", "'");
+    //sostituisce gli ampersand negli URL con &amp;
+    temp.replace("&", "&amp;");
+    // sostituisce <br> con <br/>
+    temp.replace("<br>", "<br/>");
+    temp.replace("</strong> <br/> <br/>", "</strong> </p> <br/>");
+
+    return temp;
 }

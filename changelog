@@ -8,6 +8,11 @@
   * Fixed missing tab icons
   * Fixed station filters not working with Qt 6
   * ViaggiaTreno status check no longer blocks the interface
+  * Fixed ViaggiaTreno URL: requests to mobile.viaggiatreno.it are redirected and
+    lost their form data, so station and train searches always failed
+  * Fixed parsing of ViaggiaTreno pages: scripts now injected in the page header
+    made every page unreadable
+  * Fixed train category/number swapped in station boards
 
 2013.7
 

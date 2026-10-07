@@ -9,16 +9,10 @@
 
 namespace {
 
-// riproduce DownloadViaggiaTreno::correggiOutputVT (privata nell'applicazione): i parser
-// ricevono il testo gia' trattato in questo modo
-QString correggiOutputVT(QString testo)
+// i parser ricevono il testo gia' trattato da ParserViaggiaTrenoBase::correggiOutputVT
+QString correggiOutputVT(const QString &testo)
 {
-    testo = testo.simplified();
-    testo.replace(QStringLiteral("&#039;"), QStringLiteral("'"));
-    testo.replace(QStringLiteral("&"), QStringLiteral("&amp;"));
-    testo.replace(QStringLiteral("<br>"), QStringLiteral("<br/>"));
-    testo.replace(QStringLiteral("</strong> <br/> <br/>"), QStringLiteral("</strong> </p> <br/>"));
-    return testo;
+    return ParserViaggiaTrenoBase::correggiOutputVT(testo);
 }
 
 QString leggiFixture(const QString &nome)
@@ -335,6 +329,76 @@ private Q_SLOTS:
         treno.impostaRispostaVTRiepilogo(QStringLiteral("<html><body><p>x</p></body></html>"));
         TrenoVT::DatiTreno dati;
         QVERIFY(!treno.analizzaRiepilogo(dati));
+    }
+
+    // --- pagine reali (live_*.html, scaricate da www.viaggiatreno.it il 07/10/2026) ---------------
+    // l'intestazione contiene script iniettati dal sito che rendono il documento non ben formato:
+    // correggiOutputVT deve scartarla
+    void liveStazione()
+    {
+        const QString pagina = leggiFixture("live_stazione.html");
+        QVERIFY(!pagina.isEmpty());
+
+        ParserStazioneViaggiaTreno parser(nullptr);
+        parser.impostaRispostaVT(pagina);
+        QVERIFY(!parser.stazioneNonTrovata());
+        QVERIFY(!parser.nomeStazioneAmbiguo());
+        QVERIFY2(parser.analizza(), qPrintable(parser.errore()));
+        QCOMPARE(parser.stazione(), QString("MILANO CENTRALE"));
+        QCOMPARE(parser.partenze().size(), 38);
+        QCOMPARE(parser.arrivi().size(), 38);
+
+        // "<h2> FR 9727</h2>": lo spazio iniziale non deve spostare categoria e numero
+        const StazioneVT::DatiTreno p = parser.partenze().at(0);
+        QCOMPARE(p.categoria(), QString("FR"));
+        QCOMPARE(p.numero(), QString("9727"));
+        QCOMPARE(p.codiceOrigine(), QString("S01700"));
+        QCOMPARE(p.stazione(), QString("VENEZIA S.LUCIA"));
+        QCOMPARE(p.orario(), QString("12:45"));
+        QCOMPARE(p.binarioProgrammato(), QString("13"));
+
+        const StazioneVT::DatiTreno a = parser.arrivi().at(1);
+        QCOMPARE(a.numero(), QString("2023"));
+        QCOMPARE(a.binarioProgrammato(), QString("3"));
+        QCOMPARE(a.binarioReale(), QString("4"));
+        QCOMPARE(a.ritardo(), QString("+8"));
+    }
+
+    void liveStazioneAmbigua()
+    {
+        const QString pagina = leggiFixture("live_stazione_ambigua.html");
+        ParserStazioneViaggiaTreno parser(nullptr);
+        parser.impostaRispostaVT(pagina);
+        QVERIFY(parser.nomeStazioneAmbiguo());
+        QCOMPARE(parser.listaCodiciStazioni(pagina).size(), 26);
+    }
+
+    void liveTreno()
+    {
+        ParserTrenoViaggiaTreno parser(nullptr);
+        parser.impostaRispostaVTRiepilogo(leggiFixture("live_riepilogo.html"));
+        QVERIFY(!parser.trenoNonPrevisto());
+        QVERIFY(!parser.numeroTrenoAmbiguo());
+
+        TrenoVT::DatiTreno treno;
+        QVERIFY2(parser.analizzaRiepilogo(treno), qPrintable(parser.errore()));
+        QCOMPARE(treno.numeroTreno(), QString("FR 9600"));
+        QCOMPARE(treno.categoriaTreno(), QString("FR"));
+
+        parser.impostaRispostaVTDettagli(leggiFixture("live_dettagli.html"));
+        QVERIFY2(parser.analizzaDettagli(treno), qPrintable(parser.errore()));
+        const QList<TrenoVT::Fermata *> fermate = treno.fermate();
+        QCOMPARE(fermate.size(), 3);
+        QCOMPARE(fermate.at(1)->nomeFermata(), QString("RHO FIERA"));
+        QCOMPARE(fermate.at(2)->nomeFermata(), QString("TORINO PORTA SUSA"));
+        QCOMPARE(fermate.at(2)->binarioProgrammato(), QString("1"));
+
+        ListaVT::DatiTreno lista("9600");
+        parser.impostaRispostaVTRiepilogo(leggiFixture("live_riepilogo.html"));
+        QVERIFY(parser.analizzaRiepilogoPerLista(lista));
+        QCOMPARE(lista.dato(ListaVT::dtOrigine), QString("MILANO CENTRALE"));
+        QCOMPARE(lista.dato(ListaVT::dtDestinazione), QString("TORINO PORTA NUOVA"));
+        QCOMPARE(lista.dato(ListaVT::dtRitardoTransito), QString("36 minuti in ritardo"));
     }
 };
 

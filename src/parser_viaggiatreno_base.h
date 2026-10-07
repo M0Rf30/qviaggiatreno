@@ -31,6 +31,10 @@ class ParserViaggiaTrenoBase : public QObject
 
 public:
     static   QString sostituisciNomeStazione(const QString &nome);
+
+    //corregge il codice XHTML generato da ViaggiaTreno, che NON è valido, in modo che possa
+    //essere analizzato con QDom
+    static   QString correggiOutputVT(const QString &testoVT);
 };
 
 #endif //PARSER_VIAGGIATRENO_BASE_H
