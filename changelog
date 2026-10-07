@@ -13,6 +13,9 @@
   * Fixed parsing of ViaggiaTreno pages: scripts now injected in the page header
     made every page unreadable
   * Fixed train category/number swapped in station boards
+  * Completed the "Avvisi Trenord" tab using the current trenord.it service: shows the
+    status of every Trenord line and the notices of the lines with disruptions, ordered by
+    severity, with the full text of the selected notice; the tab is restored at startup
 
 2013.7
 

@@ -19,23 +19,28 @@
  ***************************************************************************/
 
 #include "download_trenord.h"
-#include "schedaviaggiatreno.h"
+#include "schedaavvisitrenord.h"
 #include "qviaggiatreno.h"
-
-//TODO Rimuvovere l'include seguente quando non è più necessario fare debug
-#include "utils.h"
-#include "parser_trenord.h"
 
 #include <QCoreApplication>
 #include <QNetworkReply>
 #include <QNetworkRequest>
 #include <QUrl>
+#include <QUrlQuery>
 
 namespace {
 //indirizzo base del sito Trenord
-const QString s_urlBaseTrenord = QStringLiteral("http://www.trenord.it");
+const QString s_urlBaseTrenord = QStringLiteral("https://www.trenord.it");
+//lista delle linee con il relativo stato della circolazione (risposta JSON con frammento HTML)
+const QString s_percorsoLinee = QStringLiteral("/rest/render/shoulder-lines");
+//scheda di una linea con gli avvisi in corso
+const QString s_percorsoDettagliLinea = QStringLiteral("/rest/render/line-details");
 //timeout (in ms) delle richieste
 const int s_timeoutRichiesta = 30000;
+//intervallo (in ms) tra il download di due schede di linea, per non sovraccaricare il sito
+const int s_intervalloDettagli = 1000;
+//proprietà della reply con il codice della linea scaricata
+const char* const s_proprietaCodice = "codiceLinea";
 }
 
 DownloadTrenord::DownloadTrenord(QViaggiaTreno *qvt, QNetworkAccessManager *nam)
@@ -43,19 +48,31 @@ DownloadTrenord::DownloadTrenord(QViaggiaTreno *qvt, QNetworkAccessManager *nam)
     m_qvt = qvt;
     m_nam = nam;
     m_timerAvvisi = new QTimer(this);
+    m_timerAvvisi->setInterval(s_intervalloDettagli);
     connect(m_timerAvvisi, &QTimer::timeout, this, &DownloadTrenord::scaricaNuovaDirettrice);
 }
 
-//richiede al sito webTrenord la pagina con la lista delle direttrici
-void DownloadTrenord::aggiornaListaDirettrici()
+//il servizio REST di Trenord risponde 403 se la richiesta non dichiara di accettare JSON
+QNetworkRequest DownloadTrenord::creaRichiesta(const QString &percorso) const
 {
-    QNetworkRequest request;
-
-    //invia una richiesta HTTP GET per scaricare la pagina con la lista delle direttrici
-    request.setUrl(QUrl(s_urlBaseTrenord + "/mobile/it/breaking-news.aspx"));
+    QNetworkRequest request(QUrl(s_urlBaseTrenord + percorso));
     request.setHeader(QNetworkRequest::UserAgentHeader,
                       QStringLiteral("QViaggiaTreno/") + QCoreApplication::applicationVersion());
+    request.setRawHeader("Accept", "application/json, text/javascript, */*; q=0.01");
+    request.setRawHeader("X-Requested-With", "XMLHttpRequest");
     request.setTransferTimeout(s_timeoutRichiesta);
+    return request;
+}
+
+//richiede al sito Trenord la lista delle linee con il loro stato
+void DownloadTrenord::aggiornaListaDirettrici()
+{
+    QUrlQuery query;
+    query.addQueryItem(QStringLiteral("no_cache"), QStringLiteral("1"));
+    query.addQueryItem(QStringLiteral("mxp"), QStringLiteral("false"));
+    query.addQueryItem(QStringLiteral("L"), QStringLiteral("0"));
+
+    QNetworkRequest request = creaRichiesta(s_percorsoLinee + QLatin1Char('?') + query.toString(QUrl::FullyEncoded));
     request.setOriginatingObject(sender());
     QNetworkReply* reply = m_nam->get(request);
 
@@ -82,38 +99,71 @@ void DownloadTrenord::downloadFinito()
     }
 }
 
-void DownloadTrenord::scaricaAvvisi(ParserTrenord *parser)
+void DownloadTrenord::scaricaAvvisi(SchedaAvvisiTrenord* scheda, const QStringList& codiciLinee)
 {
-    m_parser = parser;
-    m_coda = parser->listaDirettrici();
+    //elimina eventuali richieste ancora in coda per la stessa scheda (aggiornamento precedente)
+    QQueue<RichiestaLinea> coda;
+    for (const RichiestaLinea &r : std::as_const(m_coda))
+        if (r.scheda && r.scheda != scheda)
+            coda.enqueue(r);
+    m_coda = coda;
 
-    if (!m_coda.count())
+    for (const QString &codice : codiciLinee)
+        m_coda.enqueue({scheda, codice});
+
+    if (m_coda.isEmpty())
         //non ci sono nuovi avvisi da scaricare, inutile continuare
         return;
 
-    //imposta il timer
-    //TODO: per il momento scarica gli avvisi con un intervallo fisso di 1 s, successivamente da configurare
-    m_timerAvvisi->setInterval(1000);
-    m_timerAvvisi->start();
+    if (!m_timerAvvisi->isActive())
+    {
+        //scarica subito la prima linea, le successive ad intervalli regolari
+        scaricaNuovaDirettrice();
+        m_timerAvvisi->start();
+    }
 }
 
-//questo slot viene richiamato dal timer. Ad ogni esecuzione preleva l'indirizzo della pagina di una direttrice
-//corregge l'url aggiungendo http://www.trenord.it
-//e avvia il download della pagina
-//se non ci sono più direttrici allora semplicemente interrompe il timeout ed esce
+//questo slot viene richiamato dal timer: ad ogni esecuzione preleva dalla coda una linea e ne
+//scarica la scheda. Se non ci sono più linee interrompe il timer
 void DownloadTrenord::scaricaNuovaDirettrice()
 {
-    //controlla che ci siano ancora direttrici da scaricare ed in caso negativo
-    //arresta il timer ed esce
-    if (!m_coda.count())
+    while (!m_coda.isEmpty())
     {
-        //TODO: questo e' il punto in cui si può aggiornare il modello!
-        m_timerAvvisi->stop();
+        const RichiestaLinea richiesta = m_coda.dequeue();
+        //la scheda potrebbe essere stata chiusa nel frattempo
+        if (!richiesta.scheda)
+            continue;
+
+        QUrlQuery query;
+        query.addQueryItem(QStringLiteral("code"), richiesta.codice);
+        query.addQueryItem(QStringLiteral("L"), QStringLiteral("0"));
+
+        QNetworkRequest request = creaRichiesta(s_percorsoDettagliLinea + QLatin1Char('?')
+                                                + query.toString(QUrl::FullyEncoded));
+        request.setOriginatingObject(richiesta.scheda);
+        QNetworkReply *reply = m_nam->get(request);
+        reply->setProperty(s_proprietaCodice, richiesta.codice);
+        connect(reply, &QNetworkReply::finished, this, &DownloadTrenord::dettagliLineaScaricati);
         return;
     }
 
-    //TODO: il download della pagina della direttrice non è ancora implementato
-    const QString url = s_urlBaseTrenord + m_coda.dequeue();
-    Q_UNUSED(url)
+    m_timerAvvisi->stop();
+}
 
+void DownloadTrenord::dettagliLineaScaricati()
+{
+    QNetworkReply* reply = qobject_cast<QNetworkReply*>(sender());
+    if (!reply)
+        return;
+    reply->deleteLater();
+
+    SchedaAvvisiTrenord *scheda = qobject_cast<SchedaAvvisiTrenord*>(reply->request().originatingObject());
+    if (!m_qvt->schedaAperta(scheda))
+        return;
+
+    const QString codice = reply->property(s_proprietaCodice).toString();
+    if (reply->error() != QNetworkReply::NoError)
+        scheda->dettagliLineaNonScaricati(codice, reply->errorString());
+    else
+        scheda->dettagliLineaScaricati(codice, QString::fromUtf8(reply->readAll()));
 }

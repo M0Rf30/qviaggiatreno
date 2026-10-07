@@ -1,6 +1,6 @@
 /***************************************************************************
- *   Copyright (C) 2008-2012 by fra74   *
- *   francesco.b74@gmail.com   *
+ *   Copyright (C) 2010-2012 by fra74                                           *
+ *   francesco.b74@gmail.com                                               *
  *                                                                         *
  *   This program is free software; you can redistribute it and/or modify  *
  *   it under the terms of the GNU General Public License as published by  *
@@ -26,6 +26,9 @@
 #include "schedaviaggiatreno.h"
 #include "ui_wgtavvisitrenord.h"
 
+#include <QHash>
+#include <QSet>
+
 class QViaggiaTreno;
 
 class WidgetAvvisiTrenord: public QWidget, private Ui::wgtAvvisiTrenord
@@ -34,6 +37,16 @@ class WidgetAvvisiTrenord: public QWidget, private Ui::wgtAvvisiTrenord
 
 public:
     WidgetAvvisiTrenord(QWidget *parent, ModelloAvvisiTrenord* modello);
+
+    //mostra la data dell'ultimo aggiornamento o un messaggio di errore
+    void impostaAggiornamento(const QString& messaggio, bool errore = false);
+    //mostra il riepilogo dello stato delle linee
+    void impostaRiepilogo(const QString& riepilogo);
+
+private:
+    void mostraAvvisoSelezionato();
+
+    ModelloAvvisiTrenord* m_modello;
 };
 
 class SchedaAvvisiTrenord: public SchedaQViaggiaTreno
@@ -46,18 +59,32 @@ public:
     QString titolo(bool = false) const override {return QString::fromUtf8("Avvisi Trenord");}
 
     void avvia() override;
-    void ferma() override;
     void aggiorna() override;
+    void salvaScheda(QSettings& settings) override;
 
     void downloadFinito(const QString &) override;
+    void downloadFallito(const QString& errore) override;
+
+    //chiamati dal downloader quando la scheda di una linea è stata scaricata (o il download è fallito)
+    void dettagliLineaScaricati(const QString& codice, const QString& risposta);
+    void dettagliLineaNonScaricati(const QString& codice, const QString& errore);
 
     ~SchedaAvvisiTrenord() override;
 
-
 private:
+    void lineaCompletata(const QString& codice);
+    void completaAggiornamento();
+
     WidgetAvvisiTrenord* m_widgetAvvisi;
     ParserTrenord* m_parser;
     ModelloAvvisiTrenord *m_avvisi;
+
+    //stato dell'aggiornamento in corso
+    bool m_inAggiornamento = false;
+    QSet<QString> m_lineeInAttesa;
+    QHash<QString, QString> m_nomiLinee;
+    QList<AvvisoTrenord> m_avvisiInArrivo;
+    QStringList m_lineeNonScaricate;
 
 Q_SIGNALS:
     void aggiornaListaDirettrici();

@@ -32,6 +32,7 @@
 #include <QTabWidget>
 #include <QToolBar>
 
+#include "schedaavvisitrenord.h"
 #include "schedastazione.h"
 #include "schedalistatreni.h"
 #include "qviaggiatreno.h"
@@ -398,6 +399,14 @@ void QViaggiaTreno::ripristinaSchede()
 
             if (nomefile != "")
                 scheda->apriFile(nomefile);
+        }
+
+        if (tipo == "avvisi trenord")
+        {
+            SchedaAvvisiTrenord *scheda = nuovaSchedaAvvisiTrenord();
+            const int intervallo = settings.value("intervallo").toInt();
+            if (intervallo > 0)
+                scheda->impostaIntervallo(intervallo);
         }
         settings.endGroup();
     }

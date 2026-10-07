@@ -22,15 +22,14 @@
 
 #include <QNetworkAccessManager>
 #include <QObject>
+#include <QPointer>
 #include <QQueue>
 #include <QString>
+#include <QStringList>
 #include <QTimer>
 
 class QViaggiaTreno;
-class ParserTrenord;
-
-// il tipo usato nella firma di uno slot deve essere completo nel codice generato da moc
-Q_MOC_INCLUDE("parser_trenord.h")
+class SchedaAvvisiTrenord;
 
 //Questa classe è la classe in cui viene centralizzato il download dal sito Trenord
 class DownloadTrenord :public QObject
@@ -39,17 +38,32 @@ class DownloadTrenord :public QObject
 public:
     DownloadTrenord(QViaggiaTreno* qvt, QNetworkAccessManager* nam);
 
+    //mette in coda il download delle schede delle linee indicate per la scheda avvisi;
+    //le schede vengono scaricate una alla volta ad intervalli regolari
+    void scaricaAvvisi(SchedaAvvisiTrenord* scheda, const QStringList& codiciLinee);
+
 public slots:
+    //scarica la lista delle linee con il loro stato; la risposta viene consegnata alla
+    //scheda che ha emesso il segnale tramite downloadFinito()/downloadFallito()
     void aggiornaListaDirettrici();
-    void scaricaAvvisi(ParserTrenord *parser);
+
+private slots:
     void downloadFinito();
     void scaricaNuovaDirettrice();
+    void dettagliLineaScaricati();
 
-    private:
+private:
+    QNetworkRequest creaRichiesta(const QString& percorso) const;
+
+    struct RichiestaLinea
+    {
+        QPointer<SchedaAvvisiTrenord> scheda;
+        QString codice;
+    };
+
     QViaggiaTreno *m_qvt;
     QNetworkAccessManager* m_nam;
-    ParserTrenord *m_parser = nullptr;
-    QQueue<QString> m_coda;
+    QQueue<RichiestaLinea> m_coda;
 
     QTimer* m_timerAvvisi;
 };
